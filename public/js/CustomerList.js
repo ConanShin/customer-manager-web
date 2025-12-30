@@ -25,6 +25,8 @@ let btnLogOut = document.getElementById("btnLogOut");
 let btnNewCustomer = document.getElementById("btnNewCustomer");
 let btnNewRepairCustomer = document.getElementById("btnNewRepairCustomer");
 let btnReadCustomer = document.getElementById("btnReadCustomer");
+// Global customers list
+let allCustomers = [];
 let btnAddCustomer = document.getElementById("btnAddCustomer");
 let btnAddRepairCustomer = document.getElementById("btnAddRepairCustomer");
 let btnDeleteCustomer = document.getElementById("btnDeleteCustomer");
@@ -61,6 +63,13 @@ let before5YearDate = convertDate(new Date().setFullYear(now.getFullYear() - 5))
 
 let isNull = function (subject) {
     return subject == undefined || subject == "";
+}
+
+function uuidv4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
 }
 
 let formatDate = function (insertDate) {
@@ -188,27 +197,49 @@ const mapCustomerToDb = (uiCustomer) => {
 
 // Main Load Logic
 async function loadCustomers() {
-    $("#loader").show();
-    const { data: customersDb, error } = await _supabase
-        .from('customers')
-        .select(`*, hearing_aids(*), repairs(*)`)
-        .order('registration_date', { ascending: false });
+    let allData = [];
+    let from = 0;
+    let to = 999;
+    let keepFetching = true;
 
-    if (error) {
-        console.error("Error loading customers:", error);
-        alert("Error loading data");
-        $("#loader").hide();
-        return;
+    while (keepFetching) {
+        const { data: customersDb, error } = await _supabase
+            .from('customers')
+            .select(`*, hearing_aids(*), repairs(*)`)
+            .order('registration_date', { ascending: false })
+            .range(from, to);
+
+        if (error) {
+            console.error("Error loading customers:", error);
+            alert("Error loading data");
+            $("#loader").hide();
+            return;
+        }
+
+        if (customersDb.length === 0) {
+            keepFetching = false;
+        } else {
+            allData = allData.concat(customersDb);
+            from += 1000;
+            to += 1000;
+            // Optional: Break if fetched less than limit, meaning we reached the end
+            if (customersDb.length < 1000) {
+                keepFetching = false;
+            }
+        }
     }
 
-    const customers = customersDb.map(mapCustomerFromDb);
-    console.log("Fetched Customers DB:", customersDb);
+    // Use the accumulated data
+    const customers = allData.map(mapCustomerFromDb);
+    allCustomers = customers; // Store correctly
+    console.log("Fetched Total Customers:", allData.length);
     console.log("Mapped Customers:", customers);
 
     // Customer List Table
     var customerListTableBody = customerListTable.getElementsByTagName("tbody")[0];
     customerListTableBody.innerHTML = "";
-
+    // Populate Notice Tables (Always active, based on ALL data or just Purchase data? Usually Purchase)
+    // Filter for Purchase Customers for Notice Tables
     var oneWeekTableBody = clearTableAndReturn(oneWeekTable);
     var threeWeekTableBody = clearTableAndReturn(threeWeekTable);
     var sevenWeekTableBody = clearTableAndReturn(sevenWeekTable);
@@ -216,14 +247,9 @@ async function loadCustomers() {
     var twoYearTableBody = clearTableAndReturn(twoYearTable);
     var fiveYearTableBody = clearTableAndReturn(fiveYearTable);
 
-    customers.forEach(function (customerData, index) {
-        var bodyRow = customerListTableBody.insertRow(index);
-        bodyRow.insertCell(0).innerHTML = '<a href="#" onclick="updateCustomer(\'' + customerData.id + '\')">' + customerData.name + '</a>';
-        bodyRow.insertCell(1).innerHTML = customerData.registrationDate || "";
-        bodyRow.insertCell(2).innerHTML = customerData.address || "";
-        bodyRow.insertCell(3).innerHTML = '<a href="tel:' + customerData.phoneNumber + '">' + (customerData.phoneNumber || "") + '</a>';
-        bodyRow.insertCell(4).innerHTML = '<a href="tel:' + customerData.mobilePhoneNumber + '">' + (customerData.mobilePhoneNumber || "") + '</a>';
+    const purchaseCustomers = customers.filter(c => c.hearingAid && c.hearingAid.length > 0);
 
+    purchaseCustomers.forEach(function (customerData) {
         if (customerData.hearingAid && customerData.hearingAid.length > 0) {
             customerData.hearingAid.forEach(function (hearingAidData) {
                 var tableRow = null;
@@ -255,40 +281,85 @@ async function loadCustomers() {
 
     sorttable.makeSortable(customerListTable);
     $("#loader").hide();
-    filterTable();
 
-    // Repair List
+    // Initial Render
+    renderCustomerList();
+}
+
+function renderCustomerList() {
+    let filterType = $("input:radio[name='buyRepair']:checked").val();
+
+    // Clear Main Tables
+    var customerListTableBody = clearTableAndReturn(customerListTable);
     var repairCustomerListTableBody = clearTableAndReturn(repairCustomerListTable);
 
-    // Repairs are fetched with customers, so we iterate customers again or just use same data
+    let filteredCustomers = [];
 
-    customers.forEach(function (customerData, index) {
-        var bodyRow = repairCustomerListTableBody.insertRow(index);
-        bodyRow.insertCell(0).innerHTML = '<a href="#" onclick="updateRepairCustomer(\'' + customerData.id + '\')">' + customerData.name + '</a>';
-        bodyRow.insertCell(1).innerHTML = customerData.registrationDate || "";
+    if (filterType == 'all') {
+        filteredCustomers = allCustomers; // Show All
+    } else if (filterType == 'buy') {
+        filteredCustomers = allCustomers.filter(c => c.hearingAid && c.hearingAid.length > 0);
+    } else if (filterType == 'repair') {
+        filteredCustomers = allCustomers.filter(c => c.repairReport && c.repairReport.length > 0);
+    }
 
-        // Last repair content
-        let lastRepair = "";
-        if (customerData.repairReport && customerData.repairReport.length > 0) {
-            // Assuming order from DB? Supabase query didn't order repairs.
-            // We just take the last one in the list or we should sort?
-            // Let's assume the list order.
-            lastRepair = customerData.repairReport[customerData.repairReport.length - 1].content;
-        }
-        bodyRow.insertCell(2).innerHTML = lastRepair;
-        bodyRow.insertCell(3).innerHTML = customerData.phoneNumber || "";
-        bodyRow.insertCell(4).innerHTML = customerData.mobilePhoneNumber || "";
-    });
+    if (filterType == 'repair') {
+        // Show Repair Table
+        customerListTable.style.display = "none";
+        repairCustomerListTable.style.display = "table";
 
-    filterTable();
+        filteredCustomers.forEach(function (customerData) {
+            var bodyRow = repairCustomerListTableBody.insertRow(repairCustomerListTableBody.rows.length);
+            bodyRow.insertCell(0).innerHTML = '<a href="#" onclick="updateRepairCustomer(\'' + customerData.id + '\')">' + customerData.name + '</a>';
+            bodyRow.insertCell(1).innerHTML = customerData.registrationDate || "";
+
+            // Last repair content
+            let lastRepair = "";
+            if (customerData.repairReport && customerData.repairReport.length > 0) {
+                lastRepair = customerData.repairReport[customerData.repairReport.length - 1].content;
+            }
+            bodyRow.insertCell(2).innerHTML = lastRepair;
+            bodyRow.insertCell(3).innerHTML = customerData.phoneNumber || "";
+            bodyRow.insertCell(4).innerHTML = customerData.mobilePhoneNumber || "";
+        });
+    } else {
+        // Show Standard Table (All or Buy)
+        customerListTable.style.display = "table";
+        repairCustomerListTable.style.display = "none";
+
+        filteredCustomers.forEach(function (customerData) {
+            var bodyRow = customerListTableBody.insertRow(customerListTableBody.rows.length);
+            bodyRow.insertCell(0).innerHTML = '<a href="#" onclick="updateCustomer(\'' + customerData.id + '\')">' + customerData.name + '</a>';
+            bodyRow.insertCell(1).innerHTML = customerData.registrationDate || "";
+            bodyRow.insertCell(2).innerHTML = customerData.address || "";
+            bodyRow.insertCell(3).innerHTML = '<a href="tel:' + customerData.phoneNumber + '">' + (customerData.phoneNumber || "") + '</a>';
+            bodyRow.insertCell(4).innerHTML = '<a href="tel:' + customerData.mobilePhoneNumber + '">' + (customerData.mobilePhoneNumber || "") + '</a>';
+        });
+    }
+
+    // Refresh Filter (Search Text) if any
+    filterTable(); // This will re-apply text search on the newly rendered table
+
+    // UI Button Visibility
+    if (filterType == 'repair') {
+        btnNewCustomer.style.display = "none";
+        btnNewRepairCustomer.style.display = "inline";
+    } else {
+        btnNewCustomer.style.display = "inline";
+        btnNewRepairCustomer.style.display = "none";
+    }
 }
 
 
 // Event Listeners & UI Logic
+// Event Listeners related to filtering
 let filterTable = function () {
     let filter, tr, td, i, count, listTable;
     filter = document.getElementById("filterInput").value;
-    listTable = $("input:radio[name='buyRepair']:checked").val() == 'buy' ? customerListTable : repairCustomerListTable;
+
+    let filterType = $("input:radio[name='buyRepair']:checked").val();
+    listTable = filterType == 'repair' ? repairCustomerListTable : customerListTable;
+
     tr = listTable.getElementsByTagName("tr");
     count = 0;
 
@@ -323,27 +394,18 @@ let filterTable = function () {
 }
 
 btnBuyRepair.change(function () {
-    if (this.value == "buy") {
-        btnNewCustomer.style.display = "inline";
-        btnNewRepairCustomer.style.display = "none";
-        customerListTable.style.display = "table";
-        repairCustomerListTable.style.display = "none";
-    } else {
-        btnNewCustomer.style.display = "none";
-        btnNewRepairCustomer.style.display = "inline";
-        customerListTable.style.display = "none";
-        repairCustomerListTable.style.display = "table";
-    }
+    renderCustomerList();
     updateCustomerId = "";
     document.getElementById("filterInput").value = "";
-    filterTable();
+    // filterTable called inside renderCustomerList
 });
 
 // Init
 (function Constructor() {
-    btnBuyRepair[0].click();
+    // btnBuyRepair[0].click(); // Don't auto-click, let it default or set 'all'
+    // Default is 'all' checked in HTML.
 
-    // Setup Headers
+    // ... setup logic ...
     let setTableHeader = function (table) {
         var tableHeader = table.getElementsByTagName("thead")[0];
         if (!tableHeader.rows.length) {
@@ -449,13 +511,12 @@ btnAddCustomer.addEventListener('click', async e => {
 
         if (isNull(cid)) {
             // INSERT
-            // Supplying UUID? Or let DB generate? Supabase can generate if id column is uuid default gen_random_uuid().
-            // If the native app expects text ID, we might need to generate simple one or use UUID.
-            // Repos say `Customer.id` is string.
-            // Let's try inserting without ID and see if DB handles it.
+            // Generate UUID for new customer
+            cid = uuidv4();
+            dbCustomer.id = cid;
+
             const { data, error } = await _supabase.from('customers').insert(dbCustomer).select();
             if (error) { alert("Error adding customer: " + error.message); return; }
-            cid = data[0].id;
         } else {
             // UPDATE
             const { error } = await _supabase.from('customers').update(dbCustomer).eq('id', cid);
@@ -543,9 +604,12 @@ btnAddRepairCustomer.addEventListener('click', async e => {
         if (uiCustomer.registrationDate) dbCustomer.registration_date = toDbDate(uiCustomer.registrationDate);
 
         if (isNull(cid)) {
+            // Generate UUID
+            cid = uuidv4();
+            dbCustomer.id = cid;
+
             const { data, error } = await _supabase.from('customers').insert(dbCustomer).select();
             if (error) { alert("Error adding customer: " + error.message); return; }
-            cid = data[0].id;
         } else {
             const { error } = await _supabase.from('customers').update(dbCustomer).eq('id', cid);
             if (error) { alert("Error updating customer: " + error.message); return; }
