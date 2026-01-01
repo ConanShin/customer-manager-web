@@ -13,6 +13,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <link rel="stylesheet" type="text/css" href="../css/CustomerList.css">
 </head>
 
@@ -120,83 +123,105 @@
                         <button id="btnCancelNewCustomer" class="btn btn-default" data-dismiss="modal">닫기</button>
                     </div>
                     <div class="modal-body newCustomerForm">
-                        <div class="modal-form-grid">
-                            <!-- Row 1: Personal (Name, Birth, Gender, Card) -->
-                            <div class="form-group">
-                                <label>이름</label>
-                                <input type="text" name="customerName" class="form-control" />
-                            </div>
-                            <div class="form-group">
-                                <label>생년월일</label>
-                                <input type="date" name="birthDate" class="form-control" />
-                            </div>
-                            <div class="form-group">
-                                <label>성별</label>
-                                <div class="segmented-control">
-                                    <input type="radio" name="customerSex" id="sexMale" value="Male"
-                                        checked="checked" />
-                                    <label for="sexMale">남</label>
-                                    <input type="radio" name="customerSex" id="sexFemale" value="Female" />
-                                    <label for="sexFemale">여</label>
+                        <div class="compact-layout">
+                            <!-- Left Sidebar -->
+                            <div class="compact-sidebar">
+                                <!-- Profile Picture -->
+                                <div class="profile-upload-container">
+                                    <img id="profilePreview" class="profile-large-preview"
+                                        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" />
+                                    <label for="profilePictureInput" class="profile-upload-overlay">
+                                        <i class="fa fa-camera profile-upload-icon"></i>
+                                    </label>
+                                    <input type="file" id="profilePictureInput" accept="image/*" />
                                 </div>
-                            </div>
-                            <div class="form-group">
-                                <label>복지카드</label>
-                                <div class="segmented-control">
-                                    <input type="radio" name="cardYN" id="cardYes" value="Yes" checked="checked" />
-                                    <label for="cardYes">유</label>
-                                    <input type="radio" name="cardYN" id="cardNo" value="No" />
-                                    <label for="cardNo">무</label>
+
+                                <!-- Name (Large Input) -->
+                                <div class="sidebar-name-input">
+                                    <input type="text" name="customerName" placeholder="고객명" autocomplete="off" />
                                 </div>
-                            </div>
 
-                            <!-- Divider -->
-                            <div class="span-4" style="height:1px; background:#e5e7eb; margin:5px 0;"></div>
+                                <!-- Sex Toggle -->
+                                <div class="compact-toggle-group">
+                                    <label>성별</label>
+                                    <div class="segmented-control" style="width:100%;">
+                                        <input type="radio" name="customerSex" id="sexMale" value="Male"
+                                            checked="checked" />
+                                        <label for="sexMale">남성</label>
+                                        <input type="radio" name="customerSex" id="sexFemale" value="Female" />
+                                        <label for="sexFemale">여성</label>
+                                    </div>
+                                </div>
 
-                            <!-- Row 2: Location/Status (Address, Join Date, Battery) -->
-                            <div class="form-group span-2">
-                                <label>주소</label>
-                                <input type="text" name="address" class="form-control" />
-                            </div>
-                            <div class="form-group">
-                                <label>가입일</label>
-                                <input type="text" name="registrationDate" class="form-control" />
-                            </div>
-                            <div class="form-group">
-                                <label>배터리 구입일</label>
-                                <input type="text" name="batteryOrderDate" class="form-control"
-                                    id="batteryOrderDateInput" />
-                            </div>
-
-                            <!-- Row 3: Contact (Home, Mobile, Hearing Aid Add) -->
-                            <div class="form-group">
-                                <label>집 번호</label>
-                                <input type="text" name="phoneNumber" class="form-control" />
-                            </div>
-                            <div class="form-group">
-                                <label>핸드폰 번호</label>
-                                <input type="text" name="mobilePhoneNumber" class="form-control" />
-                            </div>
-                            <!-- Filler to fill 3rd slot if needed, or let next item span full -->
-                            <div class="form-group"></div>
-                            <div class="form-group span-4">
-                                <label>보청기 추가</label>
-                                <div style="display:flex; gap:0; width:30px;">
-                                    <button onclick="addEarAid('left')" class="btn btn-primary"
-                                        style="flex:1; border-top-right-radius:0; border-bottom-right-radius:0;">+
-                                        좌측</button>
-                                    <button onclick="addEarAid('right')" class="btn btn-danger"
-                                        style="flex:1; border-top-left-radius:0; border-bottom-left-radius:0;">+
-                                        우측</button>
+                                <!-- Card Toggle -->
+                                <div class="compact-toggle-group">
+                                    <label>복지카드</label>
+                                    <div class="segmented-control" style="width:100%;">
+                                        <input type="radio" name="cardYN" id="cardYes" value="Yes" checked="checked" />
+                                        <label for="cardYes">보유</label>
+                                        <input type="radio" name="cardYN" id="cardNo" value="No" />
+                                        <label for="cardNo">미보유</label>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Dynamic Hearing Aid List Container -->
-                            <div id="hearingAidList" class="span-4"></div>
+                            <!-- Main Content -->
+                            <div class="compact-main">
+                                <!-- Info Grid -->
+                                <div class="info-grid">
+                                    <div class="compact-form-group">
+                                        <label>핸드폰</label>
+                                        <input type="text" name="mobilePhoneNumber" class="form-control" />
+                                    </div>
+                                    <div class="compact-form-group">
+                                        <label>집전화</label>
+                                        <input type="text" name="phoneNumber" class="form-control" />
+                                    </div>
 
-                            <div class="form-group span-4">
-                                <label>메모</label>
-                                <textarea rows="2" class="form-control"></textarea>
+                                    <div class="compact-form-group">
+                                        <label>생년월일</label>
+                                        <input type="date" name="birthDate" class="form-control" />
+                                    </div>
+                                    <div class="compact-form-group">
+                                        <label>가입일</label>
+                                        <input type="text" name="registrationDate" class="form-control" />
+                                    </div>
+
+                                    <div class="compact-form-group full-row">
+                                        <label>주소</label>
+                                        <input type="text" name="address" class="form-control" />
+                                    </div>
+                                </div>
+
+                                <!-- Hearing Aids Section -->
+                                <div class="hearing-aid-section">
+                                    <div class="section-header">
+                                        <span class="section-title">보청기 / 배터리</span>
+                                        <div style="display:flex; gap:5px;">
+                                            <button onclick="addEarAid('left')" class="btn btn-primary btn-sm"
+                                                style="padding:2px 8px; font-size:0.8rem;">+ 좌측</button>
+                                            <button onclick="addEarAid('right')" class="btn btn-danger btn-sm"
+                                                style="padding:2px 8px; font-size:0.8rem;">+ 우측</button>
+                                        </div>
+                                    </div>
+                                    <!-- Battery Purchase -->
+                                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                                        <label style="font-size:0.8rem; color:var(--text-light); width:47px;">배터리
+                                            구입</label>
+                                        <input type="text" name="batteryOrderDate" id="batteryOrderDateInput"
+                                            class="form-control"
+                                            style="font-size:0.9rem; padding:4px 8px; width:100px;" />
+                                    </div>
+                                    <!-- Dynamic List -->
+                                    <div id="hearingAidList" class="hearing-aid-compact-list"></div>
+                                </div>
+
+                                <!-- Memo -->
+                                <div class="compact-memo">
+                                    <label
+                                        style="font-size:0.8rem; color:var(--text-light); margin-bottom:2px; display:block;">메모</label>
+                                    <textarea name="note" class="form-control" placeholder="메모사항..."></textarea>
+                                </div>
                             </div>
                         </div>
                     </div>

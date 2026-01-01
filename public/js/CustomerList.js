@@ -4,11 +4,24 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const { createClient } = supabase;
 const _supabase = createClient(supabaseUrl, supabaseKey);
 
+// Firebase Config
+const firebaseConfig = {
+    apiKey: "AIzaSyBGUqCm7BSA7NBuOK5XSZwd1imvfqec5x4",
+    authDomain: "starkey.firebaseapp.com",
+    databaseURL: "https://starkey.firebaseio.com",
+    projectId: "starkey",
+    storageBucket: "starkey.firebasestorage.app",
+    messagingSenderId: "425991075433",
+    appId: "1:425991075433:web:9b9c9b9c9b9c9b9c" // Note: This App ID is a placeholder/inferred. It may need to be registered in Firebase Console for web.
+};
+firebase.initializeApp(firebaseConfig);
+const _storage = firebase.storage();
+
 // Globals
 // Globals
-const columns = ["이름", "", "연락처", "주소"];
-const repairColumns = ["이름", "", "연락처", "최근 수리내역"];
-const yearColumns = ["이름", "", "연락처", "보청기 구입일", "모델명"];
+const columns = ["이름", "사진", "", "연락처", "주소"];
+const repairColumns = ["이름", "사진", "", "연락처", "최근 수리내역"];
+const yearColumns = ["이름", "사진", "", "연락처", "보청기 구입일", "모델명"];
 
 let customerListTable = document.getElementById("customerList");
 let repairCustomerListTable = document.getElementById("repairCustomerList");
@@ -170,6 +183,7 @@ const mapCustomerFromDb = (dbCustomer) => {
         key: dbCustomer.id,
         id: dbCustomer.id,
         name: dbCustomer.name,
+        profilePictureUrl: dbCustomer.profile_picture_url,
         birthDate: birthDate,
         age: dbCustomer.age,
         sex: dbCustomer.sex,
@@ -195,6 +209,7 @@ const mapCustomerFromDb = (dbCustomer) => {
 const mapCustomerToDb = (uiCustomer) => {
     return {
         name: uiCustomer.name,
+        profile_picture_url: uiCustomer.profilePictureUrl,
         birth_date: toDbDate(uiCustomer.birthDate), // Save birth_date
         // age: uiCustomer.age, // We might not need to save age explicitly if birth_date is enough, but keeping it if UI calculates it? No UI handling for age now.
         sex: uiCustomer.sex,
@@ -326,6 +341,16 @@ async function loadCustomers() {
             row.insertCell(0).innerHTML = customerData.name;
             row.cells[0].setAttribute('data-label', '이름');
 
+            // Profile Picture
+            let imgHtml = "";
+            if (customerData.profilePictureUrl) {
+                imgHtml = `<img src="${customerData.profilePictureUrl}" class="profile-avatar-small" />`;
+            } else {
+                imgHtml = `<div class="profile-avatar-placeholder-small">${customerData.name.charAt(0)}</div>`;
+            }
+            row.insertCell(1).innerHTML = imgHtml;
+            row.cells[1].setAttribute('data-label', '사진');
+
             // Icon
             let iconHtml = "";
             if (hasLeft || hasRight) {
@@ -334,8 +359,8 @@ async function loadCustomers() {
                 if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
                 iconHtml += '</span>';
             }
-            row.insertCell(1).innerHTML = iconHtml;
-            row.cells[1].setAttribute('data-label', ''); // Icon needs no label or specific handling
+            row.insertCell(2).innerHTML = iconHtml;
+            row.cells[2].setAttribute('data-label', ''); // Icon needs no label or specific handling
 
             // Contact
             let contactInfo = "";
@@ -345,17 +370,17 @@ async function loadCustomers() {
             if (customerData.mobilePhoneNumber) {
                 contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + customerData.mobilePhoneNumber + '" onclick="event.stopPropagation()">' + customerData.mobilePhoneNumber + '</a></div>';
             }
-            row.insertCell(2).innerHTML = contactInfo;
-            row.cells[2].setAttribute('data-label', '연락처');
+            row.insertCell(3).innerHTML = contactInfo;
+            row.cells[3].setAttribute('data-label', '연락처');
 
             // Date (Use first match)
-            row.insertCell(3).innerHTML = aids[0].date || "";
-            row.cells[3].setAttribute('data-label', '구입일');
+            row.insertCell(4).innerHTML = aids[0].date || "";
+            row.cells[4].setAttribute('data-label', '구입일');
 
             // Model (Join unique)
             let models = [...new Set(aids.map(ha => ha.model))].join(', ');
-            row.insertCell(4).innerHTML = models;
-            row.cells[4].setAttribute('data-label', '모델명');
+            row.insertCell(5).innerHTML = models;
+            row.cells[5].setAttribute('data-label', '모델명');
         });
     }
 
@@ -419,8 +444,18 @@ function renderCustomerList() {
             bodyRow.insertCell(0).innerHTML = customerData.name;
             bodyRow.cells[0].setAttribute('data-label', '이름');
 
-            bodyRow.insertCell(1).innerHTML = iconHtml;
-            bodyRow.cells[1].setAttribute('data-label', '');
+            // Profile Picture
+            let imgHtml = "";
+            if (customerData.profilePictureUrl) {
+                imgHtml = `<img src="${customerData.profilePictureUrl}" class="profile-avatar-small" />`;
+            } else {
+                imgHtml = `<div class="profile-avatar-placeholder-small">${customerData.name.charAt(0)}</div>`;
+            }
+            bodyRow.insertCell(1).innerHTML = imgHtml;
+            bodyRow.cells[1].setAttribute('data-label', '사진');
+
+            bodyRow.insertCell(2).innerHTML = iconHtml;
+            bodyRow.cells[2].setAttribute('data-label', '');
 
             // Removed Registration Date
 
@@ -433,16 +468,16 @@ function renderCustomerList() {
             if (customerData.mobilePhoneNumber) {
                 contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + customerData.mobilePhoneNumber + '" onclick="event.stopPropagation()">' + customerData.mobilePhoneNumber + '</a></div>';
             }
-            bodyRow.insertCell(2).innerHTML = contactInfo;
-            bodyRow.cells[2].setAttribute('data-label', '연락처');
+            bodyRow.insertCell(3).innerHTML = contactInfo;
+            bodyRow.cells[3].setAttribute('data-label', '연락처');
 
             // Last repair content
             let lastRepair = "";
             if (customerData.repairReport && customerData.repairReport.length > 0) {
                 lastRepair = customerData.repairReport[customerData.repairReport.length - 1].content;
             }
-            bodyRow.insertCell(3).innerHTML = lastRepair;
-            bodyRow.cells[3].setAttribute('data-label', '최근 수리내역');
+            bodyRow.insertCell(4).innerHTML = lastRepair;
+            bodyRow.cells[4].setAttribute('data-label', '최근 수리내역');
         });
     } else {
         // Show Standard Table (All or Buy)
@@ -472,8 +507,18 @@ function renderCustomerList() {
             bodyRow.insertCell(0).innerHTML = customerData.name;
             bodyRow.cells[0].setAttribute('data-label', '이름');
 
-            bodyRow.insertCell(1).innerHTML = iconHtml;
-            bodyRow.cells[1].setAttribute('data-label', '');
+            // Profile Picture
+            let imgHtml = "";
+            if (customerData.profilePictureUrl) {
+                imgHtml = `<img src="${customerData.profilePictureUrl}" class="profile-avatar-small" />`;
+            } else {
+                imgHtml = `<div class="profile-avatar-placeholder-small">${customerData.name.charAt(0)}</div>`;
+            }
+            bodyRow.insertCell(1).innerHTML = imgHtml;
+            bodyRow.cells[1].setAttribute('data-label', '사진');
+
+            bodyRow.insertCell(2).innerHTML = iconHtml;
+            bodyRow.cells[2].setAttribute('data-label', '');
 
             // Removed Registration Date
             let contactInfo = "";
@@ -483,11 +528,11 @@ function renderCustomerList() {
             if (customerData.mobilePhoneNumber) {
                 contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + customerData.mobilePhoneNumber + '" onclick="event.stopPropagation()">' + customerData.mobilePhoneNumber + '</a></div>';
             }
-            bodyRow.insertCell(2).innerHTML = contactInfo;
-            bodyRow.cells[2].setAttribute('data-label', '연락처');
+            bodyRow.insertCell(3).innerHTML = contactInfo;
+            bodyRow.cells[3].setAttribute('data-label', '연락처');
 
-            bodyRow.insertCell(3).innerHTML = customerData.address || "";
-            bodyRow.cells[3].setAttribute('data-label', '주소');
+            bodyRow.insertCell(4).innerHTML = customerData.address || "";
+            bodyRow.cells[4].setAttribute('data-label', '주소');
         });
     }
 
@@ -523,7 +568,7 @@ let filterTable = function () {
         if (tr[i].parentNode.tagName === 'THEAD') continue;
 
         let found = false;
-        for (j = 0; j < 5; j++) {
+        for (j = 0; j < 6; j++) {
             td = tr[i].getElementsByTagName("td")[j];
             if (td) {
                 if (td.innerHTML.indexOf(filter) > -1) {
@@ -605,6 +650,10 @@ btnBuyRepair.change(function () {
 btnNewCustomer.addEventListener('click', e => {
     resetDialog();
     updateCustomerId = "";
+    // Reset Profile Picture UI
+    document.getElementById('profilePreview').style.display = 'none';
+    document.getElementById('profilePreview').src = "";
+    document.getElementById('profilePictureInput').value = "";
     btnDeleteCustomer.disabled = true;
 
     // Contextual Open
@@ -655,7 +704,7 @@ btnAddCustomer.addEventListener('click', async e => {
         });
     });
 
-    customerData.note = newCustomerForm.find('textarea').val();
+    customerData.note = newCustomerForm.find('textarea[name="note"]').val();
 
     if (isNull(customerData.customerName)) {
         emptyMsg = "가입자 성함을 입력해 주세요";
@@ -667,6 +716,7 @@ btnAddCustomer.addEventListener('click', async e => {
         var uiCustomer = {
             name: customerData.customerName,
             birthDate: formatDate(customerData.birthDate), // Get birthDate from form
+            profilePictureUrl: null, // Will be set after upload
             sex: customerData.customerSex,
             batteryOrderDate: formatDate(customerData.batteryOrderDate),
             cardAvailability: customerData.cardYN,
@@ -679,6 +729,46 @@ btnAddCustomer.addEventListener('click', async e => {
 
         let dbCustomer = mapCustomerToDb(uiCustomer);
         let cid = updateCustomerId;
+
+        // Image Upload Logic
+        const profileInput = document.getElementById('profilePictureInput');
+        if (profileInput.files && profileInput.files.length > 0) {
+            const file = profileInput.files[0];
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+
+            // Firebase Storage Upload
+            const storageRef = _storage.ref('customer_profiles/' + fileName);
+
+            try {
+                const snapshot = await storageRef.put(file);
+                const downloadURL = await snapshot.ref.getDownloadURL();
+                dbCustomer.profile_picture_url = downloadURL;
+            } catch (error) {
+                console.error("Upload error:", error);
+                alert("이미지 업로드 실패: " + error.message);
+                return;
+            }
+        } else {
+            // If we are updating and no new file, keep existing.
+            // But if we are updating, we need to know the existing URL? 
+            // mapCustomerToDb uses uiCustomer.profilePictureUrl which is null above.
+            // We need to fetch existing if not uploading? 
+            // Or, we set `profile_picture_url` ONLY if we have a new one, otherwise undefined to let validation/update skip it?
+            // If update, Supabase ignore undefined fields? No, it might set null if we pass null.
+            // Let's check `updateCustomerId`.
+            if (updateCustomerId) {
+                // We are updating. We didn't upload a new one.
+                // If we pass undefined/null for profile_picture_url, does it overwrite?
+                // mapCustomerToDb sets it to `uiCustomer.profilePictureUrl` which is null.
+                // So we are about to erase it if we don't handle it.
+                // We should probably look it up from `allCustomers` cache
+                const existing = allCustomers.find(c => c.id === updateCustomerId);
+                if (existing) {
+                    dbCustomer.profile_picture_url = existing.profilePictureUrl;
+                }
+            }
+        }
 
         if (isNull(cid)) {
             // INSERT
@@ -845,6 +935,18 @@ let updateCustomer = async function (customerId) {
     let c = mapCustomerFromDb(data);
 
     newCustomerForm.find("input[name='customerName']").val(c.name);
+
+    // Profile Picture Preview
+    if (c.profilePictureUrl) {
+        document.getElementById('profilePreview').src = c.profilePictureUrl;
+        // document.getElementById('profilePreview').style.display = 'block'; // Always visible now as placeholder exists
+    } else {
+        // document.getElementById('profilePreview').style.display = 'none';
+        // Reset to default placeholder
+        document.getElementById('profilePreview').src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+    }
+    document.getElementById('profilePictureInput').value = ""; // Clear input so new files can be selected
+
     // newCustomerForm.find("input[name='customerAge']").val(c.age); // Removed age input
     // Set birthDate if exists
     if (c.birthDate) {
@@ -872,7 +974,7 @@ let updateCustomer = async function (customerId) {
     newCustomerForm.find("input[name='phoneNumber']").val(c.phoneNumber);
     newCustomerForm.find("input[name='mobilePhoneNumber']").val(c.mobilePhoneNumber);
     newCustomerForm.find("input[name='registrationDate']").val(c.registrationDate);
-    newCustomerForm.find("textarea").val(c.note);
+    newCustomerForm.find("textarea[name='note']").val(c.note);
 }
 
 let updateRepairCustomer = async function (customerId) {
@@ -912,26 +1014,18 @@ let deleteDynamicItem = function (btn) {
 
 let addEarAid = function (side) {
     let side_ko = side == "left" ? "좌측" : "우측";
-    let text_class = side == "left" ? "text-primary" : "text-danger";
+    let badge_cls = side == "left" ? "left" : "right";
 
     let html = `
-    <div class="dynamic-item hearing-aid-item modal-form-grid">
-        <div class="form-group" style="flex:1;">
-            <label class="${text_class}">모델명 (${side_ko})</label>
-            <input class="form-control" type="text" name="hearingAidModel" side="${side}"/>
-        </div>
-        <div class="form-group" style="width:140px;">
-            <label>구입날짜</label>
-            <input class="form-control" type="text" name="hearingAidPurchaseDate" value="${currentDate}" side="${side}"/>
-        </div>
-        <div class="form-group" style="width:30px; justify-content:flex-end; padding-bottom:1px;">
-             <label style="opacity:0">삭제</label>
-             <button class="btn btn-default btn-grid-close" onclick="deleteDynamicItem(this)">X</button>
-        </div>
+    <div class="dynamic-item ha-compact-item hearing-aid-item">
+        <span class="ha-badge ${badge_cls}">${side_ko}</span>
+        <input class="ha-input-date" type="text" name="hearingAidPurchaseDate" value="${currentDate}" side="${side}" placeholder="YYYY-MM-DD" style="width:100px;"/>
+        <input class="ha-input-model" type="text" name="hearingAidModel" placeholder="모델명" side="${side}"/>
+        <i class="fa fa-times btn-remove-mini" onclick="deleteDynamicItem(this)"></i>
     </div>`;
 
     $("#hearingAidList").append(html);
-    return $("#hearingAidList").children().last(); // Return for value setting in update
+    return $("#hearingAidList").children().last();
 }
 
 let addNewRepairReport = function () {
@@ -984,3 +1078,18 @@ btnLogOut.addEventListener('click', async e => {
     if (error) console.log(error);
     location.replace("/html/Login.html");
 });
+
+// Profile Picture Preview Listener
+if (document.getElementById('profilePictureInput')) {
+    document.getElementById('profilePictureInput').addEventListener('change', function (e) {
+        if (e.target.files && e.target.files[0]) {
+            let reader = new FileReader();
+            reader.onload = function (e) {
+                let preview = document.getElementById('profilePreview');
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            }
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    });
+}
