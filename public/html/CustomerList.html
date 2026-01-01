@@ -18,7 +18,9 @@
             <div class="datagrid">
                 <h3>고객 리스트 (
                     <div id="customerCount"></div>명 )<input type="text" id="filterInput" onkeyup="filterTable()"
-                        placeholder="검색어 입력">
+                        placeholder="검색어 입력" style="display:inline-block; width:auto;">
+                    <button id="btnClearSearch" class="btn btn-sm btn-default" onclick="clearFilter()"><i
+                            class="fa fa-times"></i></button>
                 </h3>
                 <div class="buttonGroup">
                     <button id="btnNewCustomer" type="button" data-toggle="modal" data-target="#newCustomerDialog"

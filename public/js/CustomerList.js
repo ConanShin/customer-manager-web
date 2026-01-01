@@ -353,6 +353,11 @@ function renderCustomerList() {
 
 // Event Listeners & UI Logic
 // Event Listeners related to filtering
+let clearFilter = function () {
+    document.getElementById("filterInput").value = "";
+    filterTable();
+}
+
 let filterTable = function () {
     let filter, tr, td, i, count, listTable;
     filter = document.getElementById("filterInput").value;
@@ -396,7 +401,6 @@ let filterTable = function () {
 btnBuyRepair.change(function () {
     renderCustomerList();
     updateCustomerId = "";
-    document.getElementById("filterInput").value = "";
     // filterTable called inside renderCustomerList
 });
 
