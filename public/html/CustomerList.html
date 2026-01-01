@@ -7,7 +7,11 @@
     <script src="../lib/bootstrap.min.js"></script>
     <script src="../lib/sorttable.js"></script>
     <link rel="stylesheet" type="text/css" href="../lib/bootstrap.min.css">
-    <link rel="stylesheet" type="text/css" href="../lib/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" type="text/css" href="../css/CustomerList.css">
 </head>
@@ -15,32 +19,36 @@
 <body>
     <div class="background">
         <div id="customerListContent" class="col-xs-12 col-md-7">
-            <div class="datagrid">
-                <h3>고객 리스트 (
-                    <div id="customerCount"></div>명 )<input type="text" id="filterInput" onkeyup="filterTable()"
-                        placeholder="검색어 입력" style="display:inline-block; width:auto;">
-                    <button id="btnClearSearch" class="btn btn-sm btn-default" onclick="clearFilter()"><i
-                            class="fa fa-times"></i></button>
-                </h3>
-                <div class="buttonGroup">
-                    <button id="btnNewCustomer" type="button" data-toggle="modal" data-target="#newCustomerDialog"
-                        class="btn btn-primary">새 고객입력</button>
-                    <button id="btnNewRepairCustomer" type="button" data-toggle="modal"
-                        data-target="#newRepairCustomerDialog" class="btn btn-primary">수리고객입력</button>
-                    <!--<button id="btnReadCustomer" class="btn btn-success">고객 조회</button>-->
-                    <button id="btnLogOut" class="btn btn-danger">로그 아웃</button>
-                    <div id="btnBuyRepair" class="btn-group" data-toggle="buttons">
-                        <label class="btn btn-primary active">
-                            <input type="radio" name="buyRepair" id="option0" autocomplete="off" value="all" checked> 전체
-                        </label>
-                        <label class="btn btn-primary">
-                            <input type="radio" name="buyRepair" id="option1" autocomplete="off" value="buy"> 구매
-                        </label>
-                        <label class="btn btn-primary">
-                            <input type="radio" name="buyRepair" id="option2" autocomplete="off" value="repair"> 수리
-                        </label>
+            <div class="main-header">
+                <!-- Top Row: Controls -->
+                <div class="header-controls">
+                    <div class="action-group">
+                        <button id="btnNewCustomer" type="button" class="btn btn-primary">새 고객 입력</button>
+                        <div id="btnBuyRepair" class="btn-group segmented-control" data-toggle="buttons">
+                            <label class="btn btn-primary active">
+                                <input type="radio" name="buyRepair" id="option0" autocomplete="off" value="all"
+                                    checked> 전체
+                            </label>
+                            <label class="btn btn-primary">
+                                <input type="radio" name="buyRepair" id="option1" autocomplete="off" value="buy"> 구매
+                            </label>
+                            <label class="btn btn-primary">
+                                <input type="radio" name="buyRepair" id="option2" autocomplete="off" value="repair"> 수리
+                            </label>
+                        </div>
+                    </div>
+                    <div class="search-container">
+                        <input type="text" id="filterInput" onkeyup="filterTable()" placeholder="검색어 입력">
+                        <button id="btnClearSearch" class="btn btn-default" onclick="clearFilter()">&times;</button>
                     </div>
                 </div>
+
+                <!-- Bottom Row: Title -->
+                <div class="header-title-row">
+                    <h3>고객 리스트 (<div id="customerCount"></div>명 )</h3>
+                </div>
+            </div>
+            <div class="datagrid">
                 <div id="loader">
                     <div id="spinner"></div>
                     <h4>데이터 불러오는 중</h4>
@@ -56,6 +64,9 @@
             </div>
         </div>
         <div id="noticeContent" class="col-xs-12 col-md-5">
+            <div class="logout-container">
+                <button id="btnLogOut" class="btn btn-danger">로그아웃</button>
+            </div>
             <div class="datagrid" id="oneWeek">
                 <h3>1주차 고객</h3>
                 <table class="customersTable">
@@ -108,94 +119,86 @@
                         <h3 class="modal-title">고객 정보</h3>
                         <button id="btnCancelNewCustomer" class="btn btn-default" data-dismiss="modal">닫기</button>
                     </div>
-                    <div class="modal-body table-responsive newCustomerForm">
-                        <table class="table table-borderless">
-                            <tr>
-                                <td>
-                                    <label>이름</label>
-                                </td>
-                                <td>
-                                    <input type="text" name="customerName" class="form-control" />
-                                </td>
-                                <td>
-                                    <label>생년월일</label>
-                                </td>
-                                <td colspan="2">
-                                    <input type="date" name="birthDate" class="form-control" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <label>성별</label>
-                                </td>
-                                <td>
-                                    남<input type="radio" name="customerSex" value="Male" checked="checked" />
-                                    여<input type="radio" name="customerSex" value="Female" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <label>보청기</label>
-                                </td>
-                                <td>
-                                    <button onclick="addEarAid('left')" class="btn btn-primary">+좌</button>
-                                    <button onclick="addEarAid('right')" class="btn btn-danger">+우</button>
-                                </td>
-                            </tr>
-                            <tr id="batteryOrderDate">
-                                <td>
-                                    <label>배터리 구입일</label>
-                                </td>
-                                <td>
-                                    <input type="text" name="batteryOrderDate" class="form-control" />
-                                </td>
-                                <td>
-                                    <label>복지카드 유무</label>
-                                </td>
-                                <td>
-                                    Yes<input type="radio" name="cardYN" value="Yes" checked="checked" />
-                                    No<input type="radio" name="cardYN" value="No" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <label>주소</label>
-                                </td>
-                                <td colspan="4">
-                                    <input type="text" name="address" class="form-control" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <label>집 번호</label>
-                                </td>
-                                <td>
-                                    <input type="text" name="phoneNumber" class="form-control" />
-                                </td>
-                                <td>
-                                    <label>핸드폰 번호</label>
-                                </td>
-                                <td colspan="2">
-                                    <input type="text" name="mobilePhoneNumber" class="form-control" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <label>가입일</label>
-                                </td>
-                                <td>
-                                    <input type="text" name="registrationDate" class="form-control" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <label>메모</label>
-                                </td>
-                                <td colspan="5">
-                                    <textarea rows="4" colspan="4" class="form-control"></textarea>
-                                </td>
-                            </tr>
-                        </table>
+                    <div class="modal-body newCustomerForm">
+                        <div class="modal-form-grid">
+                            <!-- Row 1: Personal (Name, Birth, Gender, Card) -->
+                            <div class="form-group">
+                                <label>이름</label>
+                                <input type="text" name="customerName" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>생년월일</label>
+                                <input type="date" name="birthDate" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>성별</label>
+                                <div class="segmented-control">
+                                    <input type="radio" name="customerSex" id="sexMale" value="Male"
+                                        checked="checked" />
+                                    <label for="sexMale">남</label>
+                                    <input type="radio" name="customerSex" id="sexFemale" value="Female" />
+                                    <label for="sexFemale">여</label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>복지카드</label>
+                                <div class="segmented-control">
+                                    <input type="radio" name="cardYN" id="cardYes" value="Yes" checked="checked" />
+                                    <label for="cardYes">유</label>
+                                    <input type="radio" name="cardYN" id="cardNo" value="No" />
+                                    <label for="cardNo">무</label>
+                                </div>
+                            </div>
+
+                            <!-- Divider -->
+                            <div class="span-4" style="height:1px; background:#e5e7eb; margin:5px 0;"></div>
+
+                            <!-- Row 2: Location/Status (Address, Join Date, Battery) -->
+                            <div class="form-group span-2">
+                                <label>주소</label>
+                                <input type="text" name="address" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>가입일</label>
+                                <input type="text" name="registrationDate" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>배터리 구입일</label>
+                                <input type="text" name="batteryOrderDate" class="form-control"
+                                    id="batteryOrderDateInput" />
+                            </div>
+
+                            <!-- Row 3: Contact (Home, Mobile, Hearing Aid Add) -->
+                            <div class="form-group">
+                                <label>집 번호</label>
+                                <input type="text" name="phoneNumber" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>핸드폰 번호</label>
+                                <input type="text" name="mobilePhoneNumber" class="form-control" />
+                            </div>
+                            <!-- Filler to fill 3rd slot if needed, or let next item span full -->
+                            <div class="form-group"></div>
+                            <div class="form-group span-4">
+                                <label>보청기 추가</label>
+                                <div style="display:flex; gap:0; width:30px;">
+                                    <button onclick="addEarAid('left')" class="btn btn-primary"
+                                        style="flex:1; border-top-right-radius:0; border-bottom-right-radius:0;">+
+                                        좌측</button>
+                                    <button onclick="addEarAid('right')" class="btn btn-danger"
+                                        style="flex:1; border-top-left-radius:0; border-bottom-left-radius:0;">+
+                                        우측</button>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Hearing Aid List Container -->
+                            <div id="hearingAidList" class="span-4"></div>
+
+                            <div class="form-group span-4">
+                                <label>메모</label>
+                                <textarea rows="2" class="form-control"></textarea>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button id="btnAddCustomer" class="btn btn-primary">저장</button>
@@ -205,7 +208,7 @@
             </div>
         </div>
 
-        <!-- New Customer Dialog -->
+        <!-- New Repair Customer Dialog -->
         <div id="newRepairCustomerDialog" class="modal fade" role="dialog">
             <div class="modal-dialog">
                 <div class="modal-content">
@@ -213,46 +216,37 @@
                         <h3 class="modal-title">수리 고객 정보</h3>
                         <button id="btnCancelRepairCustomer" class="btn btn-default" data-dismiss="modal">닫기</button>
                     </div>
-                    <div class="modal-body table-responsive repairCustomerForm">
-                        <table class="table table-borderless">
-                            <tr>
-                                <td>
-                                    <label>이름</label>
-                                </td>
-                                <td>
-                                    <input type="text" name="customerName" class="form-control" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <label>집 번호</label>
-                                </td>
-                                <td>
-                                    <input type="text" name="phoneNumber" class="form-control" />
-                                </td>
-                                <td>
-                                    <label>핸드폰 번호</label>
-                                </td>
-                                <td colspan="2">
-                                    <input type="text" name="mobilePhoneNumber" class="form-control" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <label>가입일</label>
-                                </td>
-                                <td>
-                                    <input type="text" name="registrationDate" class="form-control" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td colspan="2">
-                                    <label>수리내역 리스트</label>
-                                    <button onclick="addNewRepairReport()" class="btn btn-primary">추가</button>
-                                </td>
-                            </tr>
-                            <tr id="repairReportList" style="display: none"></tr>
-                        </table>
+                    <div class="modal-body repairCustomerForm">
+                        <div class="modal-form-grid">
+                            <!-- Row 1 -->
+                            <div class="form-group">
+                                <label>이름</label>
+                                <input type="text" name="customerName" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>집 번호</label>
+                                <input type="text" name="phoneNumber" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>핸드폰 번호</label>
+                                <input type="text" name="mobilePhoneNumber" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>가입일</label>
+                                <input type="text" name="registrationDate" class="form-control" />
+                            </div>
+
+                            <!-- Row 2 -->
+                            <div class="form-group span-4">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <label style="margin-bottom:0;">수리내역 리스트</label>
+                                    <button onclick="addNewRepairReport()" class="btn btn-primary btn-sm">추가</button>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Repair List Container -->
+                            <div id="repairReportListContainer" class="span-4"></div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button id="btnAddRepairCustomer" class="btn btn-primary">저장</button>

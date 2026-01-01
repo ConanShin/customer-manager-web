@@ -5,9 +5,10 @@ const { createClient } = supabase;
 const _supabase = createClient(supabaseUrl, supabaseKey);
 
 // Globals
-const columns = ["이름", "가입일", "주소", "집 전화번호", "핸드폰 번호"];
-const repairColumns = ["이름", "가입일", "최근 수리내역", "집 전화번호", "핸드폰 번호"];
-const yearColumns = ["이름", "집 전화번호", "핸드폰 번호", "보청기 구입일", "모델명"];
+// Globals
+const columns = ["이름", "", "연락처", "주소"];
+const repairColumns = ["이름", "", "연락처", "최근 수리내역"];
+const yearColumns = ["이름", "", "연락처", "보청기 구입일", "모델명"];
 
 let customerListTable = document.getElementById("customerList");
 let repairCustomerListTable = document.getElementById("repairCustomerList");
@@ -141,6 +142,18 @@ let clearTableAndReturn = function (table) {
     return tableBody;
 }
 
+// Helper to render headers
+function renderHeaders(table, cols) {
+    let thead = table.getElementsByTagName("thead")[0];
+    thead.innerHTML = "";
+    let headerRow = thead.insertRow(0);
+    cols.forEach(col => {
+        let th = document.createElement("th");
+        th.innerHTML = col;
+        headerRow.appendChild(th);
+    });
+}
+
 // Data Mapping
 const mapCustomerFromDb = (dbCustomer) => {
     let birthDate = formatDate(dbCustomer.birth_date);
@@ -247,37 +260,103 @@ async function loadCustomers() {
     var twoYearTableBody = clearTableAndReturn(twoYearTable);
     var fiveYearTableBody = clearTableAndReturn(fiveYearTable);
 
+    renderHeaders(oneWeekTable, yearColumns);
+    renderHeaders(threeWeekTable, yearColumns);
+    renderHeaders(sevenWeekTable, yearColumns);
+    renderHeaders(oneYearTable, yearColumns);
+    renderHeaders(twoYearTable, yearColumns);
+    renderHeaders(fiveYearTable, yearColumns);
+
     const purchaseCustomers = customers.filter(c => c.hearingAid && c.hearingAid.length > 0);
+
+    // Bucket Aggregation
+    let buckets = {
+        oneWeek: [],
+        threeWeek: [],
+        sevenWeek: [],
+        oneYear: [],
+        twoYear: [],
+        fiveYear: []
+    };
 
     purchaseCustomers.forEach(function (customerData) {
         if (customerData.hearingAid && customerData.hearingAid.length > 0) {
-            customerData.hearingAid.forEach(function (hearingAidData) {
-                var tableRow = null;
+            let hits = {
+                oneWeek: [],
+                threeWeek: [],
+                sevenWeek: [],
+                oneYear: [],
+                twoYear: [],
+                fiveYear: []
+            };
 
-                if (isInNextThreeDays(weekAgo, hearingAidData.date)) {
-                    tableRow = oneWeekTableBody.insertRow(oneWeekTableBody.length);
-                } else if (isInNextThreeDays(threeWeeksAgo, hearingAidData.date)) {
-                    tableRow = threeWeekTableBody.insertRow(threeWeekTableBody.length);
-                } else if (isInNextThreeDays(sevenWeeksAgo, hearingAidData.date)) {
-                    tableRow = sevenWeekTableBody.insertRow(sevenWeekTableBody.length);
-                } else if (isEqualYearAndMonth(before1YearDate, hearingAidData.date)) {
-                    tableRow = oneYearTableBody.insertRow(oneYearTableBody.length);
-                } else if (isEqualYearAndMonth(before2YearDate, hearingAidData.date)) {
-                    tableRow = twoYearTableBody.insertRow(twoYearTableBody.length);
-                } else if (isEqualYearAndMonth(before5YearDate, hearingAidData.date)) {
-                    tableRow = fiveYearTableBody.insertRow(fiveYearTableBody.length);
-                } else {
-                    return;
-                }
-
-                tableRow.insertCell(0).innerHTML = '<a href="#" onclick="updateCustomer(\'' + customerData.id + '\')">' + customerData.name + '</a>';
-                tableRow.insertCell(1).innerHTML = customerData.phoneNumber || "";
-                tableRow.insertCell(2).innerHTML = customerData.mobilePhoneNumber || "";
-                tableRow.insertCell(3).innerHTML = hearingAidData.date || "";
-                tableRow.insertCell(4).innerHTML = hearingAidData.model || "";
+            customerData.hearingAid.forEach(function (ha) {
+                if (isInNextThreeDays(weekAgo, ha.date)) hits.oneWeek.push(ha);
+                else if (isInNextThreeDays(threeWeeksAgo, ha.date)) hits.threeWeek.push(ha);
+                else if (isInNextThreeDays(sevenWeeksAgo, ha.date)) hits.sevenWeek.push(ha);
+                else if (isEqualYearAndMonth(before1YearDate, ha.date)) hits.oneYear.push(ha);
+                else if (isEqualYearAndMonth(before2YearDate, ha.date)) hits.twoYear.push(ha);
+                else if (isEqualYearAndMonth(before5YearDate, ha.date)) hits.fiveYear.push(ha);
             });
+
+            // Push to main buckets
+            for (let key in hits) {
+                if (hits[key].length > 0) {
+                    buckets[key].push({
+                        customer: customerData,
+                        aids: hits[key]
+                    });
+                }
+            }
         }
     });
+
+    // Helper to render bucket items
+    function renderBucketTable(tableBody, items) {
+        items.forEach(item => {
+            let customerData = item.customer;
+            let aids = item.aids;
+            let hasLeft = aids.some(ha => ha.side === 'left');
+            let hasRight = aids.some(ha => ha.side === 'right');
+
+            let row = tableBody.insertRow();
+            row.setAttribute('onclick', 'updateCustomer(\'' + customerData.id + '\')');
+
+            // Name
+            row.insertCell(0).innerHTML = customerData.name;
+
+            // Icon
+            let iconHtml = '<span class="ear-icon-container">';
+            if (hasLeft) iconHtml += '<span class="ear-icon ear-left"></span>';
+            if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
+            iconHtml += '</span>';
+            row.insertCell(1).innerHTML = iconHtml;
+
+            // Contact
+            let contactInfo = "";
+            if (customerData.phoneNumber) {
+                contactInfo += '<div><i class="fa fa-phone"></i> ' + customerData.phoneNumber + '</div>';
+            }
+            if (customerData.mobilePhoneNumber) {
+                contactInfo += '<div><i class="fa fa-mobile"></i> ' + customerData.mobilePhoneNumber + '</div>';
+            }
+            row.insertCell(2).innerHTML = contactInfo;
+
+            // Date (Use first match)
+            row.insertCell(3).innerHTML = aids[0].date || "";
+
+            // Model (Join unique)
+            let models = [...new Set(aids.map(ha => ha.model))].join(', ');
+            row.insertCell(4).innerHTML = models;
+        });
+    }
+
+    renderBucketTable(oneWeekTableBody, buckets.oneWeek);
+    renderBucketTable(threeWeekTableBody, buckets.threeWeek);
+    renderBucketTable(sevenWeekTableBody, buckets.sevenWeek);
+    renderBucketTable(oneYearTableBody, buckets.oneYear);
+    renderBucketTable(twoYearTableBody, buckets.twoYear);
+    renderBucketTable(fiveYearTableBody, buckets.fiveYear);
 
     sorttable.makeSortable(customerListTable);
     $("#loader").hide();
@@ -285,6 +364,7 @@ async function loadCustomers() {
     // Initial Render
     renderCustomerList();
 }
+
 
 function renderCustomerList() {
     let filterType = $("input:radio[name='buyRepair']:checked").val();
@@ -306,34 +386,86 @@ function renderCustomerList() {
     if (filterType == 'repair') {
         // Show Repair Table
         customerListTable.style.display = "none";
+        renderHeaders(repairCustomerListTable, repairColumns);
         repairCustomerListTable.style.display = "table";
 
         filteredCustomers.forEach(function (customerData) {
             var bodyRow = repairCustomerListTableBody.insertRow(repairCustomerListTableBody.rows.length);
-            bodyRow.insertCell(0).innerHTML = '<a href="#" onclick="updateRepairCustomer(\'' + customerData.id + '\')">' + customerData.name + '</a>';
-            bodyRow.insertCell(1).innerHTML = customerData.registrationDate || "";
+            bodyRow.setAttribute('onclick', 'updateRepairCustomer(\'' + customerData.id + '\')');
+            var hasLeft = false;
+            var hasRight = false;
+            if (customerData.hearingAid && customerData.hearingAid.length > 0) {
+                customerData.hearingAid.forEach(function (ha) {
+                    if (ha.side === 'left') hasLeft = true;
+                    if (ha.side === 'right') hasRight = true;
+                });
+            }
+            let iconHtml = '<span class="ear-icon-container">';
+            if (hasLeft) iconHtml += '<span class="ear-icon ear-left"></span>';
+            if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
+            iconHtml += '</span>';
+
+
+
+            bodyRow.insertCell(0).innerHTML = customerData.name;
+            bodyRow.insertCell(1).innerHTML = iconHtml;
+            // Removed Registration Date
+
+            // Last repair content
+            // Last repair content
+            let contactInfo = "";
+            if (customerData.phoneNumber) {
+                contactInfo += '<div><i class="fa fa-phone"></i> ' + customerData.phoneNumber + '</div>';
+            }
+            if (customerData.mobilePhoneNumber) {
+                contactInfo += '<div><i class="fa fa-mobile"></i> ' + customerData.mobilePhoneNumber + '</div>';
+            }
+            bodyRow.insertCell(2).innerHTML = contactInfo;
 
             // Last repair content
             let lastRepair = "";
             if (customerData.repairReport && customerData.repairReport.length > 0) {
                 lastRepair = customerData.repairReport[customerData.repairReport.length - 1].content;
             }
-            bodyRow.insertCell(2).innerHTML = lastRepair;
-            bodyRow.insertCell(3).innerHTML = customerData.phoneNumber || "";
-            bodyRow.insertCell(4).innerHTML = customerData.mobilePhoneNumber || "";
+            bodyRow.insertCell(3).innerHTML = lastRepair;
         });
     } else {
         // Show Standard Table (All or Buy)
         customerListTable.style.display = "table";
         repairCustomerListTable.style.display = "none";
+        renderHeaders(customerListTable, columns);
 
         filteredCustomers.forEach(function (customerData) {
             var bodyRow = customerListTableBody.insertRow(customerListTableBody.rows.length);
-            bodyRow.insertCell(0).innerHTML = '<a href="#" onclick="updateCustomer(\'' + customerData.id + '\')">' + customerData.name + '</a>';
-            bodyRow.insertCell(1).innerHTML = customerData.registrationDate || "";
-            bodyRow.insertCell(2).innerHTML = customerData.address || "";
-            bodyRow.insertCell(3).innerHTML = '<a href="tel:' + customerData.phoneNumber + '">' + (customerData.phoneNumber || "") + '</a>';
-            bodyRow.insertCell(4).innerHTML = '<a href="tel:' + customerData.mobilePhoneNumber + '">' + (customerData.mobilePhoneNumber || "") + '</a>';
+            bodyRow.setAttribute('onclick', 'updateCustomer(\'' + customerData.id + '\')');
+            var hasLeft = false;
+            var hasRight = false;
+            if (customerData.hearingAid && customerData.hearingAid.length > 0) {
+                customerData.hearingAid.forEach(function (ha) {
+                    if (ha.side === 'left') hasLeft = true;
+                    if (ha.side === 'right') hasRight = true;
+                });
+            }
+            let iconHtml = '<span class="ear-icon-container">';
+            if (hasLeft) iconHtml += '<span class="ear-icon ear-left"></span>';
+            if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
+            iconHtml += '</span>';
+
+
+
+            bodyRow.insertCell(0).innerHTML = customerData.name;
+            bodyRow.insertCell(1).innerHTML = iconHtml;
+            // Removed Registration Date
+            let contactInfo = "";
+            if (customerData.phoneNumber) {
+                contactInfo += '<div><i class="fa fa-phone"></i> ' + customerData.phoneNumber + '</div>';
+            }
+            if (customerData.mobilePhoneNumber) {
+                contactInfo += '<div><i class="fa fa-mobile"></i> ' + customerData.mobilePhoneNumber + '</div>';
+            }
+            bodyRow.insertCell(2).innerHTML = contactInfo;
+
+            bodyRow.insertCell(3).innerHTML = customerData.address || "";
         });
     }
 
@@ -341,13 +473,9 @@ function renderCustomerList() {
     filterTable(); // This will re-apply text search on the newly rendered table
 
     // UI Button Visibility
-    if (filterType == 'repair') {
-        btnNewCustomer.style.display = "none";
-        btnNewRepairCustomer.style.display = "inline";
-    } else {
-        btnNewCustomer.style.display = "inline";
-        btnNewRepairCustomer.style.display = "none";
-    }
+    // btnNewRepairCustomer is removed from UI as per request. 
+    // We keep btnNewCustomer always visible or handle logic if needed.
+    if (btnNewCustomer) btnNewCustomer.style.display = "inline";
 }
 
 
@@ -456,13 +584,25 @@ btnNewCustomer.addEventListener('click', e => {
     resetDialog();
     updateCustomerId = "";
     btnDeleteCustomer.disabled = true;
+
+    // Contextual Open
+    let filterType = $("input:radio[name='buyRepair']:checked").val();
+    if (filterType == 'repair') {
+        // Open Repair Modal
+        $('#newRepairCustomerDialog').modal('show');
+    } else {
+        // Open Standard Customer Modal
+        $('#newCustomerDialog').modal('show');
+    }
 });
 
+/*
 btnNewRepairCustomer.addEventListener('click', e => {
     resetDialog();
     updateCustomerId = "";
     btnDeleteCustomer.disabled = true;
 });
+*/
 
 
 let getFormObjectFromForm = function (form) {
@@ -478,14 +618,19 @@ btnAddCustomer.addEventListener('click', async e => {
     var emptyMsg = "";
     customerData.hearingAid = [];
 
-    $(".hearingAidInfo").each(function (index) {
-        if (index % 2 == 0) {
-            var dateValue = $(".hearingAidInfo")[index + 1].value;
-            if (isNull(this.value) || isNull(dateValue)) {
-                emptyMsg = "빈 값이 존재합니다";
-            }
-            customerData.hearingAid.push({ "side": this.getAttribute("side"), "model": this.value, "date": formatDate(dateValue) });
+    // Updated to iterate over dynamic items
+    $(".hearing-aid-item").each(function () {
+        var modelInput = $(this).find("input[name='hearingAidModel']");
+        var dateInput = $(this).find("input[name='hearingAidPurchaseDate']");
+
+        if (isNull(modelInput.val()) || isNull(dateInput.val())) {
+            emptyMsg = "빈 값이 존재합니다";
         }
+        customerData.hearingAid.push({
+            "side": modelInput.attr("side"),
+            "model": modelInput.val(),
+            "date": formatDate(dateInput.val())
+        });
     });
 
     customerData.note = newCustomerForm.find('textarea').val();
@@ -568,15 +713,11 @@ btnAddRepairCustomer.addEventListener('click', async e => {
     var emptyMsg = "";
     customerData.repairList = [];
 
-    $(".repairReportTag").each(function (index) {
-        if (index % 2 == 0) {
-            var repairDate = $(this).find("input").val();
-            customerData.repairList.push({ "date": repairDate }); // temp object
-        } else {
-            var repairObject = customerData.repairList[Math.floor(index / 2)];
-            var repairContent = $(this).find("textarea").val();
-            repairObject.content = repairContent;
-        }
+    $(".repair-report-item").each(function () {
+        var dateVal = $(this).find("input[name='repairDate']").val();
+        var contentVal = $(this).find("textarea").val();
+
+        customerData.repairList.push({ "date": dateVal, "content": contentVal });
     });
 
     if (isNull(customerData.customerName)) {
@@ -670,7 +811,8 @@ btnDeleteRepairCustomer.addEventListener('click', async e => {
 // Load into Dialog
 let updateCustomer = async function (customerId) {
     resetDialog();
-    btnNewCustomer.click(); // Opens modal
+    // btnNewCustomer.click(); // This is risky if logic changes
+    $('#newCustomerDialog').modal('show'); // Open directly
     btnDeleteCustomer.disabled = false;
     updateCustomerId = customerId;
 
@@ -713,8 +855,13 @@ let updateCustomer = async function (customerId) {
 
 let updateRepairCustomer = async function (customerId) {
     resetDialog();
-    btnNewRepairCustomer.click();
-    btnDeleteCustomer.disabled = false;
+    // btnNewRepairCustomer.click(); // Removed button
+    $('#newRepairCustomerDialog').modal('show'); // Open directly
+    // Also enable delete button for repair customer? 
+    // Usually btnDeleteCustomer targets the main customer. 
+    // btnDeleteRepairCustomer targets repair customer.
+    // We should enable the right one.
+    if (document.getElementById("btnDeleteRepairCustomer")) document.getElementById("btnDeleteRepairCustomer").disabled = false;
     updateCustomerId = customerId;
 
     const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
@@ -737,54 +884,59 @@ let updateRepairCustomer = async function (customerId) {
 }
 
 // UI Helpers
-let deleteAidContent = function (component) {
-    component.parentNode.parentNode.remove();
-}
-
-let deleteRepairReport = function (component) {
-    let removeObject = component.parentNode.parentNode;
-    removeObject.nextSibling.remove();
-    removeObject.remove();
+let deleteDynamicItem = function (btn) {
+    $(btn).closest('.dynamic-item').remove();
 }
 
 let addEarAid = function (side) {
-    if (side == "left") {
-        var side_ko = "좌";
-        var text_color = "text-primary";
-    } else {
-        var side_ko = "우";
-        var text_color = "text-danger";
-    }
-    var newAidContent =
-        '<tr class="hearingAidInfoTag">' +
-        '<td><label class="' + text_color + '">모델명(' + side_ko + ')</label></td>' +
-        '<td><input class="hearingAidInfo form-control" type="text" name="hearingAidModel" side="' + side + '"/></td>' +
-        '<td><label>구입날짜</label></td>' +
-        '<td><input class="hearingAidInfo form-control" type="text" name="hearingAidPurchaseDate" value="' + currentDate + '" side="' + side + '"/></td>' +
-        '<td><button class="btn btn-default" onclick="deleteAidContent(this)">X</button></td>' +
-        '</tr>'
-    return $(newAidContent).insertBefore("#batteryOrderDate");
+    let side_ko = side == "left" ? "좌측" : "우측";
+    let text_class = side == "left" ? "text-primary" : "text-danger";
+
+    let html = `
+    <div class="dynamic-item hearing-aid-item modal-form-grid">
+        <div class="form-group" style="flex:1;">
+            <label class="${text_class}">모델명 (${side_ko})</label>
+            <input class="form-control" type="text" name="hearingAidModel" side="${side}"/>
+        </div>
+        <div class="form-group" style="width:140px;">
+            <label>구입날짜</label>
+            <input class="form-control" type="text" name="hearingAidPurchaseDate" value="${currentDate}" side="${side}"/>
+        </div>
+        <div class="form-group" style="width:30px; justify-content:flex-end; padding-bottom:1px;">
+             <label style="opacity:0">삭제</label>
+             <button class="btn btn-default btn-grid-close" onclick="deleteDynamicItem(this)">X</button>
+        </div>
+    </div>`;
+
+    $("#hearingAidList").append(html);
+    return $("#hearingAidList").children().last(); // Return for value setting in update
 }
 
 let addNewRepairReport = function () {
-    var newRepairReport =
-        '<tr class="repairReportTag">' +
-        '<td><label>수리일</label></td>' +
-        '<td><input type="text" name="repairDate" class="form-control" value="' + currentDate + '"/></td>' +
-        '<td><button class="btn btn-default" onclick="deleteRepairReport(this)">X</button></td>' +
-        '</tr>' +
-        '<tr class="repairReportTag">' +
-        '<td><label>수리내역</label></td>' +
-        '<td colspan="5"><textarea rows="4" colspan="4" class="form-control"></textarea></td>' +
-        '</tr>'
-    return $(newRepairReport).insertBefore("#repairReportList");
+    let html = `
+    <div class="dynamic-item repair-report-item modal-form-grid">
+        <div class="form-group" style="width:140px;">
+            <label>수리일</label>
+            <input type="text" name="repairDate" class="form-control" value="${currentDate}"/>
+        </div>
+        <div class="form-group" style="flex:1; margin-top:0;">
+            <label>수리내역</label>
+            <textarea rows="1" class="form-control"></textarea>
+        </div>
+        <div class="form-group" style="width:30px; justify-content:flex-end; padding-bottom:1px;">
+             <label style="opacity:0">삭제</label>
+             <button class="btn btn-default btn-grid-close" onclick="deleteDynamicItem(this)">X</button>
+        </div>
+    </div>`;
+
+    $("#repairReportListContainer").append(html);
+    return $("#repairReportListContainer").children().last();
 }
 
 let resetDialog = function () {
-    $(".hearingAidInfoTag").remove();
-    $(".repairReportTag").remove();
+    $(".dynamic-item").remove();
 
-    $.each($('.modal-body input'), function (index, inputTag) {
+    $.each($('.modal-body input, .modal-body textarea'), function (index, inputTag) {
         if (inputTag.name == "customerSex" || inputTag.name == "cardYN") {
             if (inputTag.value == "Male") inputTag.checked = true;
             if (inputTag.value == "Female") inputTag.checked = false;
