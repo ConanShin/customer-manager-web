@@ -327,20 +327,23 @@ async function loadCustomers() {
             row.cells[0].setAttribute('data-label', '이름');
 
             // Icon
-            let iconHtml = '<span class="ear-icon-container">';
-            if (hasLeft) iconHtml += '<span class="ear-icon ear-left"></span>';
-            if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
-            iconHtml += '</span>';
+            let iconHtml = "";
+            if (hasLeft || hasRight) {
+                iconHtml = '<span class="ear-icon-container">';
+                if (hasLeft) iconHtml += '<span class="ear-icon ear-left"></span>';
+                if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
+                iconHtml += '</span>';
+            }
             row.insertCell(1).innerHTML = iconHtml;
             row.cells[1].setAttribute('data-label', ''); // Icon needs no label or specific handling
 
             // Contact
             let contactInfo = "";
             if (customerData.phoneNumber) {
-                contactInfo += '<div><i class="fa fa-phone"></i> ' + customerData.phoneNumber + '</div>';
+                contactInfo += '<div><i class="fa fa-phone"></i> <a href="tel:' + customerData.phoneNumber + '" onclick="event.stopPropagation()">' + customerData.phoneNumber + '</a></div>';
             }
             if (customerData.mobilePhoneNumber) {
-                contactInfo += '<div><i class="fa fa-mobile"></i> ' + customerData.mobilePhoneNumber + '</div>';
+                contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + customerData.mobilePhoneNumber + '" onclick="event.stopPropagation()">' + customerData.mobilePhoneNumber + '</a></div>';
             }
             row.insertCell(2).innerHTML = contactInfo;
             row.cells[2].setAttribute('data-label', '연락처');
@@ -405,12 +408,13 @@ function renderCustomerList() {
                     if (ha.side === 'right') hasRight = true;
                 });
             }
-            let iconHtml = '<span class="ear-icon-container">';
-            if (hasLeft) iconHtml += '<span class="ear-icon ear-left"></span>';
-            if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
-            iconHtml += '</span>';
-
-
+            let iconHtml = "";
+            if (hasLeft || hasRight) {
+                iconHtml = '<span class="ear-icon-container">';
+                if (hasLeft) iconHtml += '<span class="ear-icon ear-left"></span>';
+                if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
+                iconHtml += '</span>';
+            }
 
             bodyRow.insertCell(0).innerHTML = customerData.name;
             bodyRow.cells[0].setAttribute('data-label', '이름');
@@ -424,10 +428,10 @@ function renderCustomerList() {
             // Last repair content
             let contactInfo = "";
             if (customerData.phoneNumber) {
-                contactInfo += '<div><i class="fa fa-phone"></i> ' + customerData.phoneNumber + '</div>';
+                contactInfo += '<div><i class="fa fa-phone"></i> <a href="tel:' + customerData.phoneNumber + '" onclick="event.stopPropagation()">' + customerData.phoneNumber + '</a></div>';
             }
             if (customerData.mobilePhoneNumber) {
-                contactInfo += '<div><i class="fa fa-mobile"></i> ' + customerData.mobilePhoneNumber + '</div>';
+                contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + customerData.mobilePhoneNumber + '" onclick="event.stopPropagation()">' + customerData.mobilePhoneNumber + '</a></div>';
             }
             bodyRow.insertCell(2).innerHTML = contactInfo;
             bodyRow.cells[2].setAttribute('data-label', '연락처');
@@ -457,12 +461,13 @@ function renderCustomerList() {
                     if (ha.side === 'right') hasRight = true;
                 });
             }
-            let iconHtml = '<span class="ear-icon-container">';
-            if (hasLeft) iconHtml += '<span class="ear-icon ear-left"></span>';
-            if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
-            iconHtml += '</span>';
-
-
+            let iconHtml = "";
+            if (hasLeft || hasRight) {
+                iconHtml = '<span class="ear-icon-container">';
+                if (hasLeft) iconHtml += '<span class="ear-icon ear-left"></span>';
+                if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
+                iconHtml += '</span>';
+            }
 
             bodyRow.insertCell(0).innerHTML = customerData.name;
             bodyRow.cells[0].setAttribute('data-label', '이름');
@@ -473,10 +478,10 @@ function renderCustomerList() {
             // Removed Registration Date
             let contactInfo = "";
             if (customerData.phoneNumber) {
-                contactInfo += '<div><i class="fa fa-phone"></i> ' + customerData.phoneNumber + '</div>';
+                contactInfo += '<div><i class="fa fa-phone"></i> <a href="tel:' + customerData.phoneNumber + '" onclick="event.stopPropagation()">' + customerData.phoneNumber + '</a></div>';
             }
             if (customerData.mobilePhoneNumber) {
-                contactInfo += '<div><i class="fa fa-mobile"></i> ' + customerData.mobilePhoneNumber + '</div>';
+                contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + customerData.mobilePhoneNumber + '" onclick="event.stopPropagation()">' + customerData.mobilePhoneNumber + '</a></div>';
             }
             bodyRow.insertCell(2).innerHTML = contactInfo;
             bodyRow.cells[2].setAttribute('data-label', '연락처');

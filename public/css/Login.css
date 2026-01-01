@@ -98,7 +98,7 @@ input:focus {
     }
 
     input {
-        font-size: 16px;
+        font-size: 16px !important;
         /* Prevent zoom on iOS */
         padding: 0.8rem;
     }

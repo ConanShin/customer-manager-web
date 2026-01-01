@@ -625,6 +625,8 @@ select:focus {
         width: 100%;
         /* Full width search */
         flex: 1;
+        font-size: 16px !important;
+        /* Prevent zoom */
     }
 
     .segmented-control {
@@ -707,7 +709,7 @@ select:focus {
         height: auto;
         /* Allow auto height */
         padding: 0.6rem;
-        font-size: 16px;
+        font-size: 16px !important;
         /* Prevent zoom */
     }
 
