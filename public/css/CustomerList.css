@@ -596,3 +596,129 @@ select:focus {
     justify-content: flex-end;
     margin-bottom: 20px;
 }
+
+/* Mobile Responsive Adjustments */
+@media (max-width: 900px) and (min-width: 769px) {
+    .background {
+        display: block;
+        /* Stack columns on tablet if needed or keep side-by-side but tighter */
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+        font-size: 16px;
+        /* Reset base font size for mobile */
+    }
+
+    .header-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .search-container {
+        width: 100%;
+    }
+
+    #filterInput {
+        width: 100%;
+        /* Full width search */
+        flex: 1;
+    }
+
+    .segmented-control {
+        display: flex;
+        /* Full width segmented control */
+    }
+
+    .segmented-control .btn {
+        flex: 1;
+        text-align: center;
+        padding: 0.6rem 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    /* Card View for Tables */
+    .datagrid table thead {
+        display: none;
+        /* Hide headers */
+    }
+
+    .datagrid table tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    .datagrid table tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #f3f4f6;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        text-align: right;
+    }
+
+    .datagrid table tbody td:last-child {
+        border-bottom: none;
+    }
+
+    /* Hide empty rows (cells) */
+    .datagrid table tbody td:empty {
+        display: none;
+    }
+
+    .datagrid table tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-light);
+        margin-right: 1rem;
+        text-align: left;
+        /* flex: 1; */
+    }
+
+    /* Modal Responsive */
+    .modal-dialog {
+        margin: 10px auto;
+        width: 95%;
+    }
+
+    .modal-form-grid {
+        grid-template-columns: 1fr;
+        /* Stack all inputs */
+    }
+
+    .span-4,
+    .span-3,
+    .span-2,
+    .full-width {
+        grid-column: span 1;
+    }
+
+    .modal-body input[type="text"],
+    .modal-body input[type="date"],
+    .modal-body textarea,
+    .modal-body select {
+        height: auto;
+        /* Allow auto height */
+        padding: 0.6rem;
+        font-size: 16px;
+        /* Prevent zoom */
+    }
+
+    .form-group label {
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    /* Dynamic Items Stack */
+    .dynamic-item {
+        grid-column: span 1;
+        flex-direction: column;
+    }
+}

@@ -324,6 +324,7 @@ async function loadCustomers() {
 
             // Name
             row.insertCell(0).innerHTML = customerData.name;
+            row.cells[0].setAttribute('data-label', '이름');
 
             // Icon
             let iconHtml = '<span class="ear-icon-container">';
@@ -331,6 +332,7 @@ async function loadCustomers() {
             if (hasRight) iconHtml += '<span class="ear-icon ear-right"></span>';
             iconHtml += '</span>';
             row.insertCell(1).innerHTML = iconHtml;
+            row.cells[1].setAttribute('data-label', ''); // Icon needs no label or specific handling
 
             // Contact
             let contactInfo = "";
@@ -341,13 +343,16 @@ async function loadCustomers() {
                 contactInfo += '<div><i class="fa fa-mobile"></i> ' + customerData.mobilePhoneNumber + '</div>';
             }
             row.insertCell(2).innerHTML = contactInfo;
+            row.cells[2].setAttribute('data-label', '연락처');
 
             // Date (Use first match)
             row.insertCell(3).innerHTML = aids[0].date || "";
+            row.cells[3].setAttribute('data-label', '구입일');
 
             // Model (Join unique)
             let models = [...new Set(aids.map(ha => ha.model))].join(', ');
             row.insertCell(4).innerHTML = models;
+            row.cells[4].setAttribute('data-label', '모델명');
         });
     }
 
@@ -408,7 +413,11 @@ function renderCustomerList() {
 
 
             bodyRow.insertCell(0).innerHTML = customerData.name;
+            bodyRow.cells[0].setAttribute('data-label', '이름');
+
             bodyRow.insertCell(1).innerHTML = iconHtml;
+            bodyRow.cells[1].setAttribute('data-label', '');
+
             // Removed Registration Date
 
             // Last repair content
@@ -421,6 +430,7 @@ function renderCustomerList() {
                 contactInfo += '<div><i class="fa fa-mobile"></i> ' + customerData.mobilePhoneNumber + '</div>';
             }
             bodyRow.insertCell(2).innerHTML = contactInfo;
+            bodyRow.cells[2].setAttribute('data-label', '연락처');
 
             // Last repair content
             let lastRepair = "";
@@ -428,6 +438,7 @@ function renderCustomerList() {
                 lastRepair = customerData.repairReport[customerData.repairReport.length - 1].content;
             }
             bodyRow.insertCell(3).innerHTML = lastRepair;
+            bodyRow.cells[3].setAttribute('data-label', '최근 수리내역');
         });
     } else {
         // Show Standard Table (All or Buy)
@@ -454,7 +465,11 @@ function renderCustomerList() {
 
 
             bodyRow.insertCell(0).innerHTML = customerData.name;
+            bodyRow.cells[0].setAttribute('data-label', '이름');
+
             bodyRow.insertCell(1).innerHTML = iconHtml;
+            bodyRow.cells[1].setAttribute('data-label', '');
+
             // Removed Registration Date
             let contactInfo = "";
             if (customerData.phoneNumber) {
@@ -464,8 +479,10 @@ function renderCustomerList() {
                 contactInfo += '<div><i class="fa fa-mobile"></i> ' + customerData.mobilePhoneNumber + '</div>';
             }
             bodyRow.insertCell(2).innerHTML = contactInfo;
+            bodyRow.cells[2].setAttribute('data-label', '연락처');
 
             bodyRow.insertCell(3).innerHTML = customerData.address || "";
+            bodyRow.cells[3].setAttribute('data-label', '주소');
         });
     }
 
