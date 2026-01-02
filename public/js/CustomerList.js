@@ -220,13 +220,15 @@ const mapCustomerToDb = (uiCustomer) => {
         phone_number: uiCustomer.phoneNumber,
         mobile_phone_number: uiCustomer.mobilePhoneNumber,
         registration_date: toDbDate(uiCustomer.registrationDate),
-        note: uiCustomer.note
+        note: uiCustomer.note,
+        updated_at: new Date().toISOString() // Force timestamp update for cache busting
     };
 };
 
 // Main Load Logic
 async function loadCustomers() {
-    $("#loader").show();
+    $("#loader h4").text("데이터 불러오는 중...");
+    $("#loader").css("display", "flex");
     let allData = [];
     let from = 0;
     let to = 999;
@@ -394,10 +396,10 @@ async function loadCustomers() {
     renderBucketTable(fiveYearTableBody, buckets.fiveYear);
 
     sorttable.makeSortable(customerListTable);
-    $("#loader").hide();
 
     // Initial Render
     renderCustomerList();
+    $("#loader").hide();
 }
 
 
@@ -715,96 +717,95 @@ btnAddCustomer.addEventListener('click', async e => {
     if (!isNull(emptyMsg)) {
         alert(emptyMsg);
     } else {
-        var uiCustomer = {
-            name: customerData.customerName,
-            birthDate: formatDate(customerData.birthDate), // Get birthDate from form
-            profilePictureUrl: null, // Will be set after upload
-            sex: customerData.customerSex,
-            batteryOrderDate: formatDate(customerData.batteryOrderDate),
-            cardAvailability: customerData.cardYN,
-            address: customerData.address,
-            phoneNumber: customerData.phoneNumber,
-            mobilePhoneNumber: customerData.mobilePhoneNumber,
-            registrationDate: formatDate(customerData.registrationDate),
-            note: customerData.note
-        }
-
-        let dbCustomer = mapCustomerToDb(uiCustomer);
-        let cid = updateCustomerId;
-
-        if (isNull(cid)) {
-            // New Customer: INSERT first to get ID
-            // Generate UUID if we want to determine ID beforehand? 
-            // Better to let DB or use UUID lib if available. 
-            // We have uuidv4() available from imports/global? It seems used in line 775.
-            if (typeof uuidv4 !== 'undefined') {
-                cid = uuidv4();
-                dbCustomer.id = cid;
+        $("#loader h4").text("저장 중...");
+        $("#loader").css("display", "flex");
+        try {
+            var uiCustomer = {
+                name: customerData.customerName,
+                birthDate: formatDate(customerData.birthDate), // Get birthDate from form
+                profilePictureUrl: null, // Will be set after upload
+                sex: customerData.customerSex,
+                batteryOrderDate: formatDate(customerData.batteryOrderDate),
+                cardAvailability: customerData.cardYN,
+                address: customerData.address,
+                phoneNumber: customerData.phoneNumber,
+                mobilePhoneNumber: customerData.mobilePhoneNumber,
+                registrationDate: formatDate(customerData.registrationDate),
+                note: customerData.note
             }
-            // If uuidv4 is not available, we rely on DB return? But Supabase insert returns data.
 
-            const { data, error } = await _supabase
-                .from('customers')
-                .insert([dbCustomer])
-                .select();
+            let dbCustomer = mapCustomerToDb(uiCustomer);
+            let cid = updateCustomerId;
 
-            if (error) {
-                alert("고객 추가 실패: " + error.message);
-                return;
+            if (isNull(cid)) {
+                // New Customer: INSERT first to get ID
+                if (typeof uuidv4 !== 'undefined') {
+                    cid = uuidv4();
+                    dbCustomer.id = cid;
+                }
+
+                const { data, error } = await _supabase
+                    .from('customers')
+                    .insert([dbCustomer])
+                    .select();
+
+                if (error) {
+                    alert("고객 추가 실패: " + error.message);
+                    return;
+                }
+                if (!cid && data && data.length > 0) cid = data[0].id;
+            } else {
+                // Update
+                const { error } = await _supabase
+                    .from('customers')
+                    .update(dbCustomer)
+                    .eq('id', cid);
+
+                if (error) {
+                    alert("고객 수정 실패: " + error.message);
+                    return;
+                }
+                // Delete existing relations to re-insert
+                await _supabase.from('hearing_aids').delete().eq('customer_id', cid);
             }
-            if (!cid && data && data.length > 0) cid = data[0].id;
-        } else {
-            // Update
-            const { error } = await _supabase
-                .from('customers')
-                .update(dbCustomer)
-                .eq('id', cid);
 
-            if (error) {
-                alert("고객 수정 실패: " + error.message);
-                return;
+            // Image Upload Logic (Post-Save using ID)
+            const profileInput = document.getElementById('profilePictureInput');
+            if (profileInput.files && profileInput.files.length > 0) {
+                const file = profileInput.files[0];
+                const fileName = `${cid}`; // Filename is the Customer ID
+
+                // Firebase Storage Upload
+                const storageRef = _storage.ref('customer_profiles/' + fileName);
+
+                try {
+                    await storageRef.put(file);
+                } catch (error) {
+                    console.error("Upload error:", error);
+                    alert("이미지 업로드 실패 (고객 정보는 저장됨): " + error.message);
+                }
             }
-            // Delete existing relations to re-insert
-            await _supabase.from('hearing_aids').delete().eq('customer_id', cid);
-        }
 
-        // Image Upload Logic (Post-Save using ID)
-        const profileInput = document.getElementById('profilePictureInput');
-        if (profileInput.files && profileInput.files.length > 0) {
-            const file = profileInput.files[0];
-            const fileName = `${cid}`; // Filename is the Customer ID
-
-            // Firebase Storage Upload
-            const storageRef = _storage.ref('customer_profiles/' + fileName);
-
-            try {
-                // Upload with metadata to ensure correct content type if needed, 
-                // but put(file) usually detects it.
-                await storageRef.put(file);
-                // No need to save URL.
-            } catch (error) {
-                console.error("Upload error:", error);
-                alert("이미지 업로드 실패 (고객 정보는 저장됨): " + error.message);
+            // Handle Hearing Aids
+            if (customerData.hearingAid.length > 0) {
+                let haData = customerData.hearingAid.map(ha => ({
+                    customer_id: cid,
+                    side: ha.side,
+                    model: ha.model,
+                    date: toDbDate(ha.date)
+                }));
+                const { error: haError } = await _supabase.from('hearing_aids').insert(haData);
+                if (haError) console.error("Error inserting hearing aids:", haError);
             }
-        }
 
-        // Handle Hearing Aids
-        if (customerData.hearingAid.length > 0) {
-            let haData = customerData.hearingAid.map(ha => ({
-                customer_id: cid,
-                side: ha.side,
-                model: ha.model,
-                date: toDbDate(ha.date)
-            }));
-            const { error: haError } = await _supabase.from('hearing_aids').insert(haData);
-            if (haError) console.error("Error inserting hearing aids:", haError);
+            resetUpdateStatus();
+            alert("반영완료");
+            $("#newCustomerDialog").modal('hide');
+            resetDialog();
+            await loadCustomers();
+        } finally {
+            $("#loader").hide();
         }
-
-        resetUpdateStatus();
-        alert("반영완료");
-        $("#newCustomerDialog").modal('hide');
-        resetDialog();
-        await loadCustomers();
     }
 });
 
@@ -842,65 +843,74 @@ btnAddRepairCustomer.addEventListener('click', async e => {
     if (!isNull(emptyMsg)) {
         alert(emptyMsg);
     } else {
-        // Minimal customer info from Repair Form
-        var uiCustomer = {
-            name: customerData.customerName,
-            phoneNumber: customerData.phoneNumber,
-            mobilePhoneNumber: customerData.mobilePhoneNumber,
-            registrationDate: formatDate(customerData.registrationDate)
-        };
+        $("#loader h4").text("저장 중...");
+        $("#loader").css("display", "flex");
+        try {
+            // Minimal customer info from Repair Form
+            var uiCustomer = {
+                name: customerData.customerName,
+                phoneNumber: customerData.phoneNumber,
+                mobilePhoneNumber: customerData.mobilePhoneNumber,
+                registrationDate: formatDate(customerData.registrationDate)
+            };
 
-        // We only update/insert these fields + repairs. 
-        // CAUTION: If we update, we don't want to wipe other fields (address, etc.) if they are missing here.
-        // We should fetch existing if updating.
+            let cid = updateCustomerId;
+            let dbCustomer = {};
 
-        let cid = updateCustomerId;
-        let dbCustomer = {};
+            // Map available fields
+            if (uiCustomer.name) dbCustomer.name = uiCustomer.name;
+            if (uiCustomer.phoneNumber) dbCustomer.phone_number = uiCustomer.phoneNumber;
+            if (uiCustomer.mobilePhoneNumber) dbCustomer.mobile_phone_number = uiCustomer.mobilePhoneNumber;
+            if (uiCustomer.registrationDate) dbCustomer.registration_date = toDbDate(uiCustomer.registrationDate);
+            dbCustomer.updated_at = new Date().toISOString(); // Force timestamp update for cache busting
 
-        // Map available fields
-        if (uiCustomer.name) dbCustomer.name = uiCustomer.name;
-        if (uiCustomer.phoneNumber) dbCustomer.phone_number = uiCustomer.phoneNumber;
-        if (uiCustomer.mobilePhoneNumber) dbCustomer.mobile_phone_number = uiCustomer.mobilePhoneNumber;
-        if (uiCustomer.registrationDate) dbCustomer.registration_date = toDbDate(uiCustomer.registrationDate);
+            if (isNull(cid)) {
+                // Generate UUID
+                cid = uuidv4();
+                dbCustomer.id = cid;
 
-        if (isNull(cid)) {
-            // Generate UUID
-            cid = uuidv4();
-            dbCustomer.id = cid;
+                const { data, error } = await _supabase.from('customers').insert(dbCustomer).select();
+                if (error) { alert("Error adding customer: " + error.message); return; }
+            } else {
+                const { error } = await _supabase.from('customers').update(dbCustomer).eq('id', cid);
+                if (error) { alert("Error updating customer: " + error.message); return; }
 
-            const { data, error } = await _supabase.from('customers').insert(dbCustomer).select();
-            if (error) { alert("Error adding customer: " + error.message); return; }
-        } else {
-            const { error } = await _supabase.from('customers').update(dbCustomer).eq('id', cid);
-            if (error) { alert("Error updating customer: " + error.message); return; }
+                await _supabase.from('repairs').delete().eq('customer_id', cid);
+            }
 
-            await _supabase.from('repairs').delete().eq('customer_id', cid);
+            // Handle Repairs
+            if (customerData.repairList.length > 0) {
+                let rData = customerData.repairList.map(r => ({
+                    customer_id: cid,
+                    date: toDbDate(r.date),
+                    content: r.content
+                }));
+                const { error: rError } = await _supabase.from('repairs').insert(rData);
+                if (rError) console.error("Error inserting repairs:", rError);
+            }
+
+            resetUpdateStatus();
+            alert("반영완료");
+            await loadCustomers();
+        } finally {
+            $("#loader").hide();
         }
-
-        // Handle Repairs
-        if (customerData.repairList.length > 0) {
-            let rData = customerData.repairList.map(r => ({
-                customer_id: cid,
-                date: toDbDate(r.date),
-                content: r.content
-            }));
-            const { error: rError } = await _supabase.from('repairs').insert(rData);
-            if (rError) console.error("Error inserting repairs:", rError);
-        }
-
-        resetUpdateStatus();
-        alert("반영완료");
-        await loadCustomers();
     }
 });
 
 btnDeleteCustomer.addEventListener('click', async e => {
     var confirmVal = confirm("정말 삭제하시겠습니까?");
     if (confirmVal == true) {
-        const { error } = await _supabase.from('customers').delete().eq('id', updateCustomerId);
-        if (error) alert("Error deleting: " + error.message);
-        else alert("삭제완료");
-        await loadCustomers();
+        $("#loader h4").text("삭제 중...");
+        $("#loader").css("display", "flex");
+        try {
+            const { error } = await _supabase.from('customers').delete().eq('id', updateCustomerId);
+            if (error) alert("Error deleting: " + error.message);
+            else alert("삭제완료");
+            await loadCustomers();
+        } finally {
+            $("#loader").hide();
+        }
     }
     resetUpdateStatus();
 });
@@ -908,16 +918,16 @@ btnDeleteCustomer.addEventListener('click', async e => {
 btnDeleteRepairCustomer.addEventListener('click', async e => {
     var confirmVal = confirm("정말 삭제하시겠습니까?");
     if (confirmVal == true) {
-        // Deleting "Repair Customer" means deleting the customer? Or just repairs?
-        // Original: `repairRef.child(updateCustomerId).remove()`.
-        // This implies deleting the customer's repair record.
-        // If we want to maintain same behavior, we might just want to delete the user? 
-        // Or maybe just delete repairs?
-        // Usually "Delete" button in a modal for a customer means delete the customer.
-        const { error } = await _supabase.from('customers').delete().eq('id', updateCustomerId);
-        if (error) alert("Error deleting: " + error.message);
-        else alert("삭제완료");
-        await loadCustomers();
+        $("#loader h4").text("삭제 중...");
+        $("#loader").css("display", "flex");
+        try {
+            const { error } = await _supabase.from('customers').delete().eq('id', updateCustomerId);
+            if (error) alert("Error deleting: " + error.message);
+            else alert("삭제완료");
+            await loadCustomers();
+        } finally {
+            $("#loader").hide();
+        }
     }
     resetUpdateStatus();
 });
@@ -925,92 +935,104 @@ btnDeleteRepairCustomer.addEventListener('click', async e => {
 
 // Load into Dialog
 let updateCustomer = async function (customerId) {
-    resetDialog();
-    // btnNewCustomer.click(); // This is risky if logic changes
-    $('#newCustomerDialog').modal('show'); // Open directly
-    btnDeleteCustomer.disabled = false;
-    updateCustomerId = customerId;
+    $("#loader h4").text("정보 불러오는 중...");
+    $("#loader").css("display", "flex");
+    try {
+        resetDialog();
+        // btnNewCustomer.click(); // This is risky if logic changes
+        $('#newCustomerDialog').modal('show'); // Open directly
+        btnDeleteCustomer.disabled = false;
+        updateCustomerId = customerId;
 
-    // We can fetch fresh or find in loaded list. Let's fetch fresh for safety.
-    const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
-    if (error) { console.error(error); return; }
+        // We can fetch fresh or find in loaded list. Let's fetch fresh for safety.
+        const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
+        if (error) { console.error(error); return; }
 
-    let c = mapCustomerFromDb(data);
+        let c = mapCustomerFromDb(data);
 
-    newCustomerForm.find("input[name='customerName']").val(c.name);
+        newCustomerForm.find("input[name='customerName']").val(c.name);
 
-    // Profile Picture Preview
-    // Profile Picture Preview (Update Mode)
-    // Try to load from standard URL
-    let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${c.id}?alt=media&t=${c.updatedAt ? new Date(c.updatedAt).getTime() : ''}`;
-    // We need to check if it exists? Image onerror can handle display.
-    let preview = document.getElementById('profilePreview');
-    preview.src = profileUrl;
-    preview.onerror = function () {
-        // On error (404), show placeholder
-        this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-        // Reset handler to prevent infinite loop if placeholder fails (unlikely for data uri)
-        this.onerror = null;
-    };
-    document.getElementById('profilePictureInput').value = ""; // Clear input so new files can be selected
+        // Profile Picture Preview
+        // Profile Picture Preview (Update Mode)
+        // Try to load from standard URL
+        let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${c.id}?alt=media&t=${c.updatedAt ? new Date(c.updatedAt).getTime() : ''}`;
+        // We need to check if it exists? Image onerror can handle display.
+        let preview = document.getElementById('profilePreview');
+        preview.src = profileUrl;
+        preview.onerror = function () {
+            // On error (404), show placeholder
+            this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+            // Reset handler to prevent infinite loop if placeholder fails (unlikely for data uri)
+            this.onerror = null;
+        };
+        document.getElementById('profilePictureInput').value = ""; // Clear input so new files can be selected
 
-    // newCustomerForm.find("input[name='customerAge']").val(c.age); // Removed age input
-    // Set birthDate if exists
-    if (c.birthDate) {
-        // UI expects YYYY-MM-DD for date input? 
-        // toDbDate converts YYYY/MM/DD to YYYY-MM-DD which works for <input type="date"> value
-        newCustomerForm.find("input[name='birthDate']").val(toDbDate(c.birthDate));
+        // newCustomerForm.find("input[name='customerAge']").val(c.age); // Removed age input
+        // Set birthDate if exists
+        if (c.birthDate) {
+            // UI expects YYYY-MM-DD for date input? 
+            // toDbDate converts YYYY/MM/DD to YYYY-MM-DD which works for <input type="date"> value
+            newCustomerForm.find("input[name='birthDate']").val(toDbDate(c.birthDate));
+        }
+        let customerSexRadio = newCustomerForm.find("input:radio[name='customerSex']");
+        if (c.sex == "Male") customerSexRadio[0].checked = true;
+        else if (c.sex == "Female") customerSexRadio[1].checked = true;
+        else customerSexRadio[0].checked = true;
+
+        if (c.hearingAid) {
+            c.hearingAid.forEach(function (ha) {
+                var aidContent = $(addEarAid(ha.side));
+                aidContent.find("input[name='hearingAidModel']").val(ha.model);
+                aidContent.find("input[name='hearingAidPurchaseDate']").val(toDbDate(ha.date));
+            });
+        }
+        newCustomerForm.find("input[name='batteryOrderDate']").val(toDbDate(c.batteryOrderDate));
+        let cardAvailabilityRadio = newCustomerForm.find("input:radio[name='cardYN']");
+        c.cardAvailability == "Yes" ? cardAvailabilityRadio[0].checked = true : cardAvailabilityRadio[1].checked = true;
+
+        newCustomerForm.find("input[name='address']").val(c.address);
+        newCustomerForm.find("input[name='phoneNumber']").val(c.phoneNumber);
+        newCustomerForm.find("input[name='mobilePhoneNumber']").val(c.mobilePhoneNumber);
+        newCustomerForm.find("input[name='registrationDate']").val(toDbDate(c.registrationDate));
+        newCustomerForm.find("textarea[name='note']").val(c.note);
+    } finally {
+        $("#loader").hide();
     }
-    let customerSexRadio = newCustomerForm.find("input:radio[name='customerSex']");
-    if (c.sex == "Male") customerSexRadio[0].checked = true;
-    else if (c.sex == "Female") customerSexRadio[1].checked = true;
-    else customerSexRadio[0].checked = true;
-
-    if (c.hearingAid) {
-        c.hearingAid.forEach(function (ha) {
-            var aidContent = $(addEarAid(ha.side));
-            aidContent.find("input[name='hearingAidModel']").val(ha.model);
-            aidContent.find("input[name='hearingAidPurchaseDate']").val(toDbDate(ha.date));
-        });
-    }
-    newCustomerForm.find("input[name='batteryOrderDate']").val(toDbDate(c.batteryOrderDate));
-    let cardAvailabilityRadio = newCustomerForm.find("input:radio[name='cardYN']");
-    c.cardAvailability == "Yes" ? cardAvailabilityRadio[0].checked = true : cardAvailabilityRadio[1].checked = true;
-
-    newCustomerForm.find("input[name='address']").val(c.address);
-    newCustomerForm.find("input[name='phoneNumber']").val(c.phoneNumber);
-    newCustomerForm.find("input[name='mobilePhoneNumber']").val(c.mobilePhoneNumber);
-    newCustomerForm.find("input[name='registrationDate']").val(toDbDate(c.registrationDate));
-    newCustomerForm.find("textarea[name='note']").val(c.note);
 }
 
 let updateRepairCustomer = async function (customerId) {
-    resetDialog();
-    // btnNewRepairCustomer.click(); // Removed button
-    $('#newRepairCustomerDialog').modal('show'); // Open directly
-    // Also enable delete button for repair customer? 
-    // Usually btnDeleteCustomer targets the main customer. 
-    // btnDeleteRepairCustomer targets repair customer.
-    // We should enable the right one.
-    if (document.getElementById("btnDeleteRepairCustomer")) document.getElementById("btnDeleteRepairCustomer").disabled = false;
-    updateCustomerId = customerId;
+    $("#loader h4").text("정보 불러오는 중...");
+    $("#loader").css("display", "flex");
+    try {
+        resetDialog();
+        // btnNewRepairCustomer.click(); // Removed button
+        $('#newRepairCustomerDialog').modal('show'); // Open directly
+        // Also enable delete button for repair customer? 
+        // Usually btnDeleteCustomer targets the main customer. 
+        // btnDeleteRepairCustomer targets repair customer.
+        // We should enable the right one.
+        if (document.getElementById("btnDeleteRepairCustomer")) document.getElementById("btnDeleteRepairCustomer").disabled = false;
+        updateCustomerId = customerId;
 
-    const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
-    if (error) { console.error(error); return; }
+        const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
+        if (error) { console.error(error); return; }
 
-    let c = mapCustomerFromDb(data);
+        let c = mapCustomerFromDb(data);
 
-    newRepairForm.find("input[name='customerName']").val(c.name);
-    newRepairForm.find("input[name='phoneNumber']").val(c.phoneNumber);
-    newRepairForm.find("input[name='mobilePhoneNumber']").val(c.mobilePhoneNumber);
-    newRepairForm.find("input[name='registrationDate']").val(toDbDate(c.registrationDate));
+        newRepairForm.find("input[name='customerName']").val(c.name);
+        newRepairForm.find("input[name='phoneNumber']").val(c.phoneNumber);
+        newRepairForm.find("input[name='mobilePhoneNumber']").val(c.mobilePhoneNumber);
+        newRepairForm.find("input[name='registrationDate']").val(toDbDate(c.registrationDate));
 
-    if (c.repairReport) {
-        c.repairReport.forEach(function (r) {
-            var repairReportContent = $(addNewRepairReport());
-            repairReportContent.find("input[name='repairDate']").val(toDbDate(r.date));
-            repairReportContent.find("textarea").val(r.content);
-        });
+        if (c.repairReport) {
+            c.repairReport.forEach(function (r) {
+                var repairReportContent = $(addNewRepairReport());
+                repairReportContent.find("input[name='repairDate']").val(toDbDate(r.date));
+                repairReportContent.find("textarea").val(r.content);
+            });
+        }
+    } finally {
+        $("#loader").hide();
     }
 }
 
