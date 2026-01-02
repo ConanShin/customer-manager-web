@@ -61,14 +61,15 @@ _supabase.auth.onAuthStateChange((event, session) => {
 });
 
 // Date Utils
-function convertDate(inputFormat) {
+function convertDate(inputFormat, separator = '/') {
     function pad(s) { return (s < 10) ? '0' + s : s; }
     var d = new Date(inputFormat);
-    return [pad(d.getFullYear()), pad(d.getMonth() + 1), pad(d.getDate())].join('/');
+    return [pad(d.getFullYear()), pad(d.getMonth() + 1), pad(d.getDate())].join(separator);
 }
 
 let now = new Date();
-let currentDate = convertDate(now);
+let currentDate = convertDate(now, '/'); // For UI Display
+let currentDbDate = convertDate(now, '-'); // For DB and <input type="date">
 let weekAgo = convertDate(new Date().setDate(now.getDate() - 7));
 let threeWeeksAgo = convertDate(new Date().setDate(now.getDate() - 21));
 let sevenWeeksAgo = convertDate(new Date().setDate(now.getDate() - 49));
@@ -76,7 +77,7 @@ let before1YearDate = convertDate(new Date().setFullYear(now.getFullYear() - 1))
 let before2YearDate = convertDate(new Date().setFullYear(now.getFullYear() - 2));
 let before5YearDate = convertDate(new Date().setFullYear(now.getFullYear() - 5));
 
-let isNull = function (subject) {
+function isNull(subject) {
     return subject == undefined || subject == "";
 }
 
@@ -87,7 +88,7 @@ function uuidv4() {
     });
 }
 
-let formatDate = function (insertDate) {
+function formatDate(insertDate) {
     if (isNull(insertDate)) return "";
     // Handle YYYY-MM-DD or YYYY/MM/DD inputs
     let datePart = String(insertDate).replace(/-/g, "/");
@@ -114,12 +115,12 @@ let formatDate = function (insertDate) {
     return insertYear + "/" + formattedMonth + "/" + formattedDay;
 }
 
-let toDbDate = function (uiDate) {
+function toDbDate(uiDate) {
     if (isNull(uiDate)) return null;
     return uiDate.replace(/\//g, "-");
 }
 
-let isInNextThreeDays = function (tableDate, purchaseDate) {
+function isInNextThreeDays(tableDate, purchaseDate) {
     if (isNull(purchaseDate)) return false;
     var tableDateYear = tableDate.split("/")[0];
     var tableDateMonth = tableDate.split("/")[1];
@@ -969,17 +970,17 @@ let updateCustomer = async function (customerId) {
         c.hearingAid.forEach(function (ha) {
             var aidContent = $(addEarAid(ha.side));
             aidContent.find("input[name='hearingAidModel']").val(ha.model);
-            aidContent.find("input[name='hearingAidPurchaseDate']").val(ha.date);
+            aidContent.find("input[name='hearingAidPurchaseDate']").val(toDbDate(ha.date));
         });
     }
-    newCustomerForm.find("input[name='batteryOrderDate']").val(c.batteryOrderDate);
+    newCustomerForm.find("input[name='batteryOrderDate']").val(toDbDate(c.batteryOrderDate));
     let cardAvailabilityRadio = newCustomerForm.find("input:radio[name='cardYN']");
     c.cardAvailability == "Yes" ? cardAvailabilityRadio[0].checked = true : cardAvailabilityRadio[1].checked = true;
 
     newCustomerForm.find("input[name='address']").val(c.address);
     newCustomerForm.find("input[name='phoneNumber']").val(c.phoneNumber);
     newCustomerForm.find("input[name='mobilePhoneNumber']").val(c.mobilePhoneNumber);
-    newCustomerForm.find("input[name='registrationDate']").val(c.registrationDate);
+    newCustomerForm.find("input[name='registrationDate']").val(toDbDate(c.registrationDate));
     newCustomerForm.find("textarea[name='note']").val(c.note);
 }
 
@@ -1002,12 +1003,12 @@ let updateRepairCustomer = async function (customerId) {
     newRepairForm.find("input[name='customerName']").val(c.name);
     newRepairForm.find("input[name='phoneNumber']").val(c.phoneNumber);
     newRepairForm.find("input[name='mobilePhoneNumber']").val(c.mobilePhoneNumber);
-    newRepairForm.find("input[name='registrationDate']").val(c.registrationDate);
+    newRepairForm.find("input[name='registrationDate']").val(toDbDate(c.registrationDate));
 
     if (c.repairReport) {
         c.repairReport.forEach(function (r) {
             var repairReportContent = $(addNewRepairReport());
-            repairReportContent.find("input[name='repairDate']").val(r.date);
+            repairReportContent.find("input[name='repairDate']").val(toDbDate(r.date));
             repairReportContent.find("textarea").val(r.content);
         });
     }
@@ -1025,7 +1026,7 @@ let addEarAid = function (side) {
     let html = `
     <div class="dynamic-item ha-compact-item hearing-aid-item">
         <span class="ha-badge ${badge_cls}">${side_ko}</span>
-        <input class="ha-input-date" type="text" name="hearingAidPurchaseDate" value="${currentDate}" side="${side}" placeholder="YYYY-MM-DD" style="width:100px;"/>
+        <input class="ha-input-date" type="date" name="hearingAidPurchaseDate" value="${currentDbDate}" side="${side}" style="width:100px;"/>
         <input class="ha-input-model" type="text" name="hearingAidModel" placeholder="모델명" side="${side}"/>
         <i class="fa fa-times btn-remove-mini" onclick="deleteDynamicItem(this)"></i>
     </div>`;
@@ -1039,7 +1040,7 @@ let addNewRepairReport = function () {
     <div class="dynamic-item repair-report-item modal-form-grid">
         <div class="form-group" style="width:140px;">
             <label>수리일</label>
-            <input type="text" name="repairDate" class="form-control" value="${currentDate}"/>
+            <input type="date" name="repairDate" class="form-control" value="${currentDbDate}"/>
         </div>
         <div class="form-group" style="flex:1; margin-top:0;">
             <label>수리내역</label>
