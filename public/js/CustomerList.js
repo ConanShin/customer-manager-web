@@ -202,7 +202,8 @@ const mapCustomerFromDb = (dbCustomer) => {
         repairReport: dbCustomer.repairs ? dbCustomer.repairs.map(r => ({
             date: formatDate(r.date),
             content: r.content
-        })) : []
+        })) : [],
+        updatedAt: dbCustomer.updated_at
     };
 };
 
@@ -224,6 +225,7 @@ const mapCustomerToDb = (uiCustomer) => {
 
 // Main Load Logic
 async function loadCustomers() {
+    $("#loader").show();
     let allData = [];
     let from = 0;
     let to = 999;
@@ -233,7 +235,7 @@ async function loadCustomers() {
         const { data: customersDb, error } = await _supabase
             .from('customers')
             .select(`*, hearing_aids(*), repairs(*)`)
-            .order('registration_date', { ascending: false })
+            .order('updated_at', { ascending: false })
             .range(from, to);
 
         if (error) {
@@ -341,7 +343,7 @@ async function loadCustomers() {
             row.cells[0].setAttribute('data-label', '이름');
 
             // Profile Picture (Constructed from ID)
-            let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media`;
+            let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media&t=${customerData.updatedAt ? new Date(customerData.updatedAt).getTime() : ''}`;
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
                 <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
@@ -444,7 +446,7 @@ function renderCustomerList() {
             bodyRow.cells[0].setAttribute('data-label', '이름');
 
             // Profile Picture (Constructed from ID)
-            let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media`;
+            let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media&t=${customerData.updatedAt ? new Date(customerData.updatedAt).getTime() : ''}`;
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
                 <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
@@ -507,7 +509,7 @@ function renderCustomerList() {
             bodyRow.cells[0].setAttribute('data-label', '이름');
 
             // Profile Picture (Constructed from ID)
-            let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media`;
+            let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media&t=${customerData.updatedAt ? new Date(customerData.updatedAt).getTime() : ''}`;
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
                 <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
@@ -801,7 +803,7 @@ btnAddCustomer.addEventListener('click', async e => {
         alert("반영완료");
         $("#newCustomerDialog").modal('hide');
         resetDialog();
-        fetchCustomerList();
+        await loadCustomers();
     }
 });
 
@@ -887,7 +889,7 @@ btnAddRepairCustomer.addEventListener('click', async e => {
 
         resetUpdateStatus();
         alert("반영완료");
-        loadCustomers();
+        await loadCustomers();
     }
 });
 
@@ -897,7 +899,7 @@ btnDeleteCustomer.addEventListener('click', async e => {
         const { error } = await _supabase.from('customers').delete().eq('id', updateCustomerId);
         if (error) alert("Error deleting: " + error.message);
         else alert("삭제완료");
-        loadCustomers();
+        await loadCustomers();
     }
     resetUpdateStatus();
 });
@@ -914,7 +916,7 @@ btnDeleteRepairCustomer.addEventListener('click', async e => {
         const { error } = await _supabase.from('customers').delete().eq('id', updateCustomerId);
         if (error) alert("Error deleting: " + error.message);
         else alert("삭제완료");
-        loadCustomers();
+        await loadCustomers();
     }
     resetUpdateStatus();
 });
@@ -939,7 +941,7 @@ let updateCustomer = async function (customerId) {
     // Profile Picture Preview
     // Profile Picture Preview (Update Mode)
     // Try to load from standard URL
-    let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${c.id}?alt=media`;
+    let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${c.id}?alt=media&t=${c.updatedAt ? new Date(c.updatedAt).getTime() : ''}`;
     // We need to check if it exists? Image onerror can handle display.
     let preview = document.getElementById('profilePreview');
     preview.src = profileUrl;
