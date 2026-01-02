@@ -10,7 +10,7 @@ const firebaseConfig = {
     authDomain: "starkey.firebaseapp.com",
     databaseURL: "https://starkey.firebaseio.com",
     projectId: "starkey",
-    storageBucket: "starkey.firebasestorage.app",
+    storageBucket: "starkey.appspot.com",
     messagingSenderId: "425991075433",
     appId: "1:425991075433:web:9b9c9b9c9b9c9b9c" // Note: This App ID is a placeholder/inferred. It may need to be registered in Firebase Console for web.
 };
@@ -20,6 +20,7 @@ const _storage = firebase.storage();
 // Globals
 // Globals
 const columns = ["이름", "사진", "", "연락처", "주소"];
+const _storageBucketName = "starkey.appspot.com"; // from config but hardcoded for URL construction
 const repairColumns = ["이름", "사진", "", "연락처", "최근 수리내역"];
 const yearColumns = ["이름", "사진", "", "연락처", "보청기 구입일", "모델명"];
 
@@ -183,7 +184,6 @@ const mapCustomerFromDb = (dbCustomer) => {
         key: dbCustomer.id,
         id: dbCustomer.id,
         name: dbCustomer.name,
-        profilePictureUrl: dbCustomer.profile_picture_url,
         birthDate: birthDate,
         age: dbCustomer.age,
         sex: dbCustomer.sex,
@@ -209,7 +209,6 @@ const mapCustomerFromDb = (dbCustomer) => {
 const mapCustomerToDb = (uiCustomer) => {
     return {
         name: uiCustomer.name,
-        profile_picture_url: uiCustomer.profilePictureUrl,
         birth_date: toDbDate(uiCustomer.birthDate), // Save birth_date
         // age: uiCustomer.age, // We might not need to save age explicitly if birth_date is enough, but keeping it if UI calculates it? No UI handling for age now.
         sex: uiCustomer.sex,
@@ -341,13 +340,13 @@ async function loadCustomers() {
             row.insertCell(0).innerHTML = customerData.name;
             row.cells[0].setAttribute('data-label', '이름');
 
-            // Profile Picture
-            let imgHtml = "";
-            if (customerData.profilePictureUrl) {
-                imgHtml = `<img src="${customerData.profilePictureUrl}" class="profile-avatar-small" />`;
-            } else {
-                imgHtml = `<div class="profile-avatar-placeholder-small">${customerData.name.charAt(0)}</div>`;
-            }
+            // Profile Picture (Constructed from ID)
+            let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media`;
+            let imgHtml = `
+            <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
+                <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
+                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${customerData.name.charAt(0)}</div>
+            </div>`;
             row.insertCell(1).innerHTML = imgHtml;
             row.cells[1].setAttribute('data-label', '사진');
 
@@ -730,61 +729,60 @@ btnAddCustomer.addEventListener('click', async e => {
         let dbCustomer = mapCustomerToDb(uiCustomer);
         let cid = updateCustomerId;
 
-        // Image Upload Logic
+        if (isNull(cid)) {
+            // New Customer: INSERT first to get ID
+            // Generate UUID if we want to determine ID beforehand? 
+            // Better to let DB or use UUID lib if available. 
+            // We have uuidv4() available from imports/global? It seems used in line 775.
+            if (typeof uuidv4 !== 'undefined') {
+                cid = uuidv4();
+                dbCustomer.id = cid;
+            }
+            // If uuidv4 is not available, we rely on DB return? But Supabase insert returns data.
+
+            const { data, error } = await _supabase
+                .from('customers')
+                .insert([dbCustomer])
+                .select();
+
+            if (error) {
+                alert("고객 추가 실패: " + error.message);
+                return;
+            }
+            if (!cid && data && data.length > 0) cid = data[0].id;
+        } else {
+            // Update
+            const { error } = await _supabase
+                .from('customers')
+                .update(dbCustomer)
+                .eq('id', cid);
+
+            if (error) {
+                alert("고객 수정 실패: " + error.message);
+                return;
+            }
+            // Delete existing relations to re-insert
+            await _supabase.from('hearing_aids').delete().eq('customer_id', cid);
+        }
+
+        // Image Upload Logic (Post-Save using ID)
         const profileInput = document.getElementById('profilePictureInput');
         if (profileInput.files && profileInput.files.length > 0) {
             const file = profileInput.files[0];
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+            const fileName = `${cid}`; // Filename is the Customer ID
 
             // Firebase Storage Upload
             const storageRef = _storage.ref('customer_profiles/' + fileName);
 
             try {
-                const snapshot = await storageRef.put(file);
-                const downloadURL = await snapshot.ref.getDownloadURL();
-                dbCustomer.profile_picture_url = downloadURL;
+                // Upload with metadata to ensure correct content type if needed, 
+                // but put(file) usually detects it.
+                await storageRef.put(file);
+                // No need to save URL.
             } catch (error) {
                 console.error("Upload error:", error);
-                alert("이미지 업로드 실패: " + error.message);
-                return;
+                alert("이미지 업로드 실패 (고객 정보는 저장됨): " + error.message);
             }
-        } else {
-            // If we are updating and no new file, keep existing.
-            // But if we are updating, we need to know the existing URL? 
-            // mapCustomerToDb uses uiCustomer.profilePictureUrl which is null above.
-            // We need to fetch existing if not uploading? 
-            // Or, we set `profile_picture_url` ONLY if we have a new one, otherwise undefined to let validation/update skip it?
-            // If update, Supabase ignore undefined fields? No, it might set null if we pass null.
-            // Let's check `updateCustomerId`.
-            if (updateCustomerId) {
-                // We are updating. We didn't upload a new one.
-                // If we pass undefined/null for profile_picture_url, does it overwrite?
-                // mapCustomerToDb sets it to `uiCustomer.profilePictureUrl` which is null.
-                // So we are about to erase it if we don't handle it.
-                // We should probably look it up from `allCustomers` cache
-                const existing = allCustomers.find(c => c.id === updateCustomerId);
-                if (existing) {
-                    dbCustomer.profile_picture_url = existing.profilePictureUrl;
-                }
-            }
-        }
-
-        if (isNull(cid)) {
-            // INSERT
-            // Generate UUID for new customer
-            cid = uuidv4();
-            dbCustomer.id = cid;
-
-            const { data, error } = await _supabase.from('customers').insert(dbCustomer).select();
-            if (error) { alert("Error adding customer: " + error.message); return; }
-        } else {
-            // UPDATE
-            const { error } = await _supabase.from('customers').update(dbCustomer).eq('id', cid);
-            if (error) { alert("Error updating customer: " + error.message); return; }
-
-            // Delete existing relations to re-insert
-            await _supabase.from('hearing_aids').delete().eq('customer_id', cid);
         }
 
         // Handle Hearing Aids
@@ -801,7 +799,9 @@ btnAddCustomer.addEventListener('click', async e => {
 
         resetUpdateStatus();
         alert("반영완료");
-        loadCustomers();
+        $("#newCustomerDialog").modal('hide');
+        resetDialog();
+        fetchCustomerList();
     }
 });
 
@@ -937,14 +937,18 @@ let updateCustomer = async function (customerId) {
     newCustomerForm.find("input[name='customerName']").val(c.name);
 
     // Profile Picture Preview
-    if (c.profilePictureUrl) {
-        document.getElementById('profilePreview').src = c.profilePictureUrl;
-        // document.getElementById('profilePreview').style.display = 'block'; // Always visible now as placeholder exists
-    } else {
-        // document.getElementById('profilePreview').style.display = 'none';
-        // Reset to default placeholder
-        document.getElementById('profilePreview').src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-    }
+    // Profile Picture Preview (Update Mode)
+    // Try to load from standard URL
+    let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${c.id}?alt=media`;
+    // We need to check if it exists? Image onerror can handle display.
+    let preview = document.getElementById('profilePreview');
+    preview.src = profileUrl;
+    preview.onerror = function () {
+        // On error (404), show placeholder
+        this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+        // Reset handler to prevent infinite loop if placeholder fails (unlikely for data uri)
+        this.onerror = null;
+    };
     document.getElementById('profilePictureInput').value = ""; // Clear input so new files can be selected
 
     // newCustomerForm.find("input[name='customerAge']").val(c.age); // Removed age input
