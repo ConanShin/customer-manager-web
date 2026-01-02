@@ -443,13 +443,13 @@ function renderCustomerList() {
             bodyRow.insertCell(0).innerHTML = customerData.name;
             bodyRow.cells[0].setAttribute('data-label', '이름');
 
-            // Profile Picture
-            let imgHtml = "";
-            if (customerData.profilePictureUrl) {
-                imgHtml = `<img src="${customerData.profilePictureUrl}" class="profile-avatar-small" />`;
-            } else {
-                imgHtml = `<div class="profile-avatar-placeholder-small">${customerData.name.charAt(0)}</div>`;
-            }
+            // Profile Picture (Constructed from ID)
+            let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media`;
+            let imgHtml = `
+            <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
+                <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
+                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${customerData.name.charAt(0)}</div>
+            </div>`;
             bodyRow.insertCell(1).innerHTML = imgHtml;
             bodyRow.cells[1].setAttribute('data-label', '사진');
 
@@ -506,13 +506,13 @@ function renderCustomerList() {
             bodyRow.insertCell(0).innerHTML = customerData.name;
             bodyRow.cells[0].setAttribute('data-label', '이름');
 
-            // Profile Picture
-            let imgHtml = "";
-            if (customerData.profilePictureUrl) {
-                imgHtml = `<img src="${customerData.profilePictureUrl}" class="profile-avatar-small" />`;
-            } else {
-                imgHtml = `<div class="profile-avatar-placeholder-small">${customerData.name.charAt(0)}</div>`;
-            }
+            // Profile Picture (Constructed from ID)
+            let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media`;
+            let imgHtml = `
+            <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
+                <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
+                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${customerData.name.charAt(0)}</div>
+            </div>`;
             bodyRow.insertCell(1).innerHTML = imgHtml;
             bodyRow.cells[1].setAttribute('data-label', '사진');
 
