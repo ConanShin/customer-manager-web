@@ -21,7 +21,7 @@ const _storage = firebase.storage();
 // Globals
 const columns = ["이름", "사진", "", "연락처", "주소"];
 const _storageBucketName = "starkey.appspot.com"; // from config but hardcoded for URL construction
-const repairColumns = ["이름", "사진", "", "연락처", "최근 수리내역"];
+let repairColumns = ["이름", "사진", "", "연락처", "최근 수리내역"];
 const yearColumns = ["이름", "사진", "", "연락처", "보청기 구입일", "모델명"];
 
 let customerListTable = document.getElementById("customerList");
@@ -238,7 +238,7 @@ async function loadCustomers() {
         const { data: customersDb, error } = await _supabase
             .from('customers')
             .select(`*, hearing_aids(*), repairs(*)`)
-            .order('updated_at', { ascending: false })
+            .order('updated_at', { ascending: false, nullsFirst: false })
             .range(from, to);
 
         if (error) {
@@ -350,7 +350,7 @@ async function loadCustomers() {
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
                 <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
-                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${customerData.name.charAt(0)}</div>
+                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${[...customerData.name][0] || '?'}</div>
             </div>`;
             row.insertCell(1).innerHTML = imgHtml;
             row.cells[1].setAttribute('data-label', '사진');
@@ -453,7 +453,7 @@ function renderCustomerList() {
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
                 <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
-                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${customerData.name.charAt(0)}</div>
+                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${[...customerData.name][0] || '?'}</div>
             </div>`;
             bodyRow.insertCell(1).innerHTML = imgHtml;
             bodyRow.cells[1].setAttribute('data-label', '사진');
@@ -516,7 +516,7 @@ function renderCustomerList() {
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
                 <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
-                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${customerData.name.charAt(0)}</div>
+                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${[...customerData.name][0] || '?'}</div>
             </div>`;
             bodyRow.insertCell(1).innerHTML = imgHtml;
             bodyRow.cells[1].setAttribute('data-label', '사진');
@@ -655,8 +655,9 @@ btnNewCustomer.addEventListener('click', e => {
     resetDialog();
     updateCustomerId = "";
     // Reset Profile Picture UI
-    document.getElementById('profilePreview').style.display = 'none';
-    document.getElementById('profilePreview').src = "";
+    let preview = document.getElementById('profilePreview');
+    preview.style.display = 'block';
+    preview.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
     document.getElementById('profilePictureInput').value = "";
     btnDeleteCustomer.disabled = true;
 
@@ -905,8 +906,18 @@ btnDeleteCustomer.addEventListener('click', async e => {
         $("#loader").css("display", "flex");
         try {
             const { error } = await _supabase.from('customers').delete().eq('id', updateCustomerId);
-            if (error) alert("Error deleting: " + error.message);
-            else alert("삭제완료");
+            if (error) {
+                alert("Error deleting: " + error.message);
+            } else {
+                // Delete from Firebase Storage if exists
+                try {
+                    await _storage.ref('customer_profiles/' + updateCustomerId).delete();
+                    console.log("Profile picture deleted successfully");
+                } catch (e) {
+                    console.log("Storage object not found or could not be deleted:", e);
+                }
+                alert("삭제완료");
+            }
             await loadCustomers();
         } finally {
             $("#loader").hide();
@@ -922,8 +933,18 @@ btnDeleteRepairCustomer.addEventListener('click', async e => {
         $("#loader").css("display", "flex");
         try {
             const { error } = await _supabase.from('customers').delete().eq('id', updateCustomerId);
-            if (error) alert("Error deleting: " + error.message);
-            else alert("삭제완료");
+            if (error) {
+                alert("Error deleting: " + error.message);
+            } else {
+                // Delete from Firebase Storage if exists
+                try {
+                    await _storage.ref('customer_profiles/' + updateCustomerId).delete();
+                    console.log("Profile picture deleted successfully");
+                } catch (e) {
+                    console.log("Storage object not found or could not be deleted:", e);
+                }
+                alert("삭제완료");
+            }
             await loadCustomers();
         } finally {
             $("#loader").hide();
@@ -958,6 +979,7 @@ let updateCustomer = async function (customerId) {
         let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${c.id}?alt=media&t=${c.updatedAt ? new Date(c.updatedAt).getTime() : ''}`;
         // We need to check if it exists? Image onerror can handle display.
         let preview = document.getElementById('profilePreview');
+        preview.style.display = 'block';
         preview.src = profileUrl;
         preview.onerror = function () {
             // On error (404), show placeholder
