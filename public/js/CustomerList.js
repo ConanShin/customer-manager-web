@@ -190,6 +190,8 @@ const mapCustomerFromDb = (dbCustomer) => {
         sex: dbCustomer.sex,
         batteryOrderDate: formatDate(dbCustomer.battery_order_date),
         cardAvailability: dbCustomer.card_availability == 'Yes' ? 'Yes' : 'No', // Default check
+        cochlearImplant: dbCustomer.cochlear_implant == 'Yes' ? 'Yes' : 'No',
+        workersComp: dbCustomer.workers_comp == 'Yes' ? 'Yes' : 'No',
         address: dbCustomer.address,
         phoneNumber: dbCustomer.phone_number,
         mobilePhoneNumber: dbCustomer.mobile_phone_number,
@@ -216,6 +218,8 @@ const mapCustomerToDb = (uiCustomer) => {
         sex: uiCustomer.sex,
         battery_order_date: toDbDate(uiCustomer.batteryOrderDate),
         card_availability: uiCustomer.cardAvailability, // check value
+        cochlear_implant: uiCustomer.cochlearImplant,
+        workers_comp: uiCustomer.workersComp,
         address: uiCustomer.address,
         phone_number: uiCustomer.phoneNumber,
         mobile_phone_number: uiCustomer.mobilePhoneNumber,
@@ -728,6 +732,8 @@ btnAddCustomer.addEventListener('click', async e => {
                 sex: customerData.customerSex,
                 batteryOrderDate: formatDate(customerData.batteryOrderDate),
                 cardAvailability: customerData.cardYN,
+                cochlearImplant: customerData.cochlearYN,
+                workersComp: customerData.workersCompYN,
                 address: customerData.address,
                 phoneNumber: customerData.phoneNumber,
                 mobilePhoneNumber: customerData.mobilePhoneNumber,
@@ -1012,6 +1018,12 @@ let updateCustomer = async function (customerId) {
         let cardAvailabilityRadio = newCustomerForm.find("input:radio[name='cardYN']");
         c.cardAvailability == "Yes" ? cardAvailabilityRadio[0].checked = true : cardAvailabilityRadio[1].checked = true;
 
+        let cochlearRadio = newCustomerForm.find("input:radio[name='cochlearYN']");
+        c.cochlearImplant == "Yes" ? cochlearRadio[0].checked = true : cochlearRadio[1].checked = true;
+
+        let workersCompRadio = newCustomerForm.find("input:radio[name='workersCompYN']");
+        c.workersComp == "Yes" ? workersCompRadio[0].checked = true : workersCompRadio[1].checked = true;
+
         newCustomerForm.find("input[name='address']").val(c.address);
         newCustomerForm.find("input[name='phoneNumber']").val(c.phoneNumber);
         newCustomerForm.find("input[name='mobilePhoneNumber']").val(c.mobilePhoneNumber);
@@ -1104,11 +1116,11 @@ let resetDialog = function () {
     $(".dynamic-item").remove();
 
     $.each($('.modal-body input, .modal-body textarea'), function (index, inputTag) {
-        if (inputTag.name == "customerSex" || inputTag.name == "cardYN") {
+        if (inputTag.name == "customerSex" || inputTag.name == "cardYN" || inputTag.name == "cochlearYN" || inputTag.name == "workersCompYN") {
             if (inputTag.value == "Male") inputTag.checked = true;
             if (inputTag.value == "Female") inputTag.checked = false;
-            if (inputTag.value == "Yes") inputTag.checked = true;
-            if (inputTag.value == "No") inputTag.checked = false;
+            if (inputTag.value == "Yes") inputTag.checked = (inputTag.name == "cardYN"); // Default cardYN to Yes, others to No
+            if (inputTag.value == "No") inputTag.checked = (inputTag.name != "cardYN");
         } else if (inputTag.name == "hearingAidPurchaseDate" || inputTag.name == "batteryOrderDate" || inputTag.name == "registrationDate" || inputTag.name == "birthDate") {
             inputTag.value = currentDate;
         } else {

@@ -137,26 +137,54 @@
                                     <input type="text" name="customerName" placeholder="고객명" autocomplete="off" />
                                 </div>
 
-                                <!-- Sex Toggle -->
-                                <div class="compact-toggle-group">
-                                    <label>성별</label>
-                                    <div class="segmented-control" style="width:100%;">
-                                        <input type="radio" name="customerSex" id="sexMale" value="Male"
-                                            checked="checked" />
-                                        <label for="sexMale">남성</label>
-                                        <input type="radio" name="customerSex" id="sexFemale" value="Female" />
-                                        <label for="sexFemale">여성</label>
+                                <!-- Toggles Grid -->
+                                <div class="sidebar-toggles-grid">
+                                    <!-- Sex Toggle -->
+                                    <div class="compact-toggle-group">
+                                        <label>성별</label>
+                                        <div class="segmented-control" style="width:100%;">
+                                            <input type="radio" name="customerSex" id="sexMale" value="Male"
+                                                checked="checked" />
+                                            <label for="sexMale">남성</label>
+                                            <input type="radio" name="customerSex" id="sexFemale" value="Female" />
+                                            <label for="sexFemale">여성</label>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <!-- Card Toggle -->
-                                <div class="compact-toggle-group">
-                                    <label>복지카드</label>
-                                    <div class="segmented-control" style="width:100%;">
-                                        <input type="radio" name="cardYN" id="cardYes" value="Yes" checked="checked" />
-                                        <label for="cardYes">보유</label>
-                                        <input type="radio" name="cardYN" id="cardNo" value="No" />
-                                        <label for="cardNo">미보유</label>
+                                    <!-- Card Toggle -->
+                                    <div class="compact-toggle-group">
+                                        <label>복지카드</label>
+                                        <div class="segmented-control" style="width:100%;">
+                                            <input type="radio" name="cardYN" id="cardYes" value="Yes"
+                                                checked="checked" />
+                                            <label for="cardYes">보유</label>
+                                            <input type="radio" name="cardYN" id="cardNo" value="No" />
+                                            <label for="cardNo">미보유</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Cochlear Implant Toggle -->
+                                    <div class="compact-toggle-group">
+                                        <label>인공와우</label>
+                                        <div class="segmented-control" style="width:100%;">
+                                            <input type="radio" name="cochlearYN" id="cochlearYes" value="Yes" />
+                                            <label for="cochlearYes">적용</label>
+                                            <input type="radio" name="cochlearYN" id="cochlearNo" value="No"
+                                                checked="checked" />
+                                            <label for="cochlearNo">미적용</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Workers Comp Toggle -->
+                                    <div class="compact-toggle-group">
+                                        <label>산재보험</label>
+                                        <div class="segmented-control" style="width:100%;">
+                                            <input type="radio" name="workersCompYN" id="workersCompYes" value="Yes" />
+                                            <label for="workersCompYes">적용</label>
+                                            <input type="radio" name="workersCompYN" id="workersCompNo" value="No"
+                                                checked="checked" />
+                                            <label for="workersCompNo">미적용</label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
