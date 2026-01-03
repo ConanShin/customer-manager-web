@@ -48,6 +48,7 @@ let btnDeleteCustomer = document.getElementById("btnDeleteCustomer");
 let btnDeleteRepairCustomer = document.getElementById("btnDeleteRepairCustomer");
 let btnCancelNewCustomer = document.getElementById("btnCancelNewCustomer");
 let btnCancelRepairCustomer = document.getElementById("btnCancelRepairCustomer");
+let btnSalesStats = document.getElementById("btnSalesStats");
 
 let updateCustomerId = "";
 
@@ -196,6 +197,11 @@ const mapCustomerFromDb = (dbCustomer) => {
         phoneNumber: dbCustomer.phone_number,
         mobilePhoneNumber: dbCustomer.mobile_phone_number,
         registrationDate: formatDate(dbCustomer.registration_date),
+        fittingTest1: formatDate(dbCustomer.fitting_test_1),
+        fittingTest2: formatDate(dbCustomer.fitting_test_2),
+        fittingTest3: formatDate(dbCustomer.fitting_test_3),
+        fittingTest4: formatDate(dbCustomer.fitting_test_4),
+        fittingTest5: formatDate(dbCustomer.fitting_test_5),
         note: dbCustomer.note,
         hearingAid: dbCustomer.hearing_aids ? dbCustomer.hearing_aids.map(ha => ({
             side: ha.side,
@@ -224,6 +230,11 @@ const mapCustomerToDb = (uiCustomer) => {
         phone_number: uiCustomer.phoneNumber,
         mobile_phone_number: uiCustomer.mobilePhoneNumber,
         registration_date: toDbDate(uiCustomer.registrationDate),
+        fitting_test_1: toDbDate(uiCustomer.fittingTest1),
+        fitting_test_2: toDbDate(uiCustomer.fittingTest2),
+        fitting_test_3: toDbDate(uiCustomer.fittingTest3),
+        fitting_test_4: toDbDate(uiCustomer.fittingTest4),
+        fitting_test_5: toDbDate(uiCustomer.fittingTest5),
         note: uiCustomer.note,
         updated_at: new Date().toISOString() // Force timestamp update for cache busting
     };
@@ -738,6 +749,11 @@ btnAddCustomer.addEventListener('click', async e => {
                 phoneNumber: customerData.phoneNumber,
                 mobilePhoneNumber: customerData.mobilePhoneNumber,
                 registrationDate: formatDate(customerData.registrationDate),
+                fittingTest1: formatDate(customerData.fittingTest1),
+                fittingTest2: formatDate(customerData.fittingTest2),
+                fittingTest3: formatDate(customerData.fittingTest3),
+                fittingTest4: formatDate(customerData.fittingTest4),
+                fittingTest5: formatDate(customerData.fittingTest5),
                 note: customerData.note
             }
 
@@ -1028,6 +1044,11 @@ let updateCustomer = async function (customerId) {
         newCustomerForm.find("input[name='phoneNumber']").val(c.phoneNumber);
         newCustomerForm.find("input[name='mobilePhoneNumber']").val(c.mobilePhoneNumber);
         newCustomerForm.find("input[name='registrationDate']").val(toDbDate(c.registrationDate));
+        newCustomerForm.find("input[name='fittingTest1']").val(toDbDate(c.fittingTest1));
+        newCustomerForm.find("input[name='fittingTest2']").val(toDbDate(c.fittingTest2));
+        newCustomerForm.find("input[name='fittingTest3']").val(toDbDate(c.fittingTest3));
+        newCustomerForm.find("input[name='fittingTest4']").val(toDbDate(c.fittingTest4));
+        newCustomerForm.find("input[name='fittingTest5']").val(toDbDate(c.fittingTest5));
         newCustomerForm.find("textarea[name='note']").val(c.note);
     } finally {
         $("#loader").hide();
@@ -1153,6 +1174,63 @@ if (document.getElementById('profilePictureInput')) {
                 preview.style.display = 'block';
             }
             reader.readAsDataURL(e.target.files[0]);
+        }
+    });
+}
+
+// Sales Statistics Logic
+if (btnSalesStats) {
+    btnSalesStats.addEventListener('click', async () => {
+        $("#loader h4").text("실적 집계 중...");
+        $("#loader").css("display", "flex");
+
+        try {
+            // Fetch all hearing aids
+            const { data: hearingAids, error } = await _supabase
+                .from('hearing_aids')
+                .select('date');
+
+            if (error) throw error;
+
+            // Group by year
+            const stats = {};
+            hearingAids.forEach(ha => {
+                if (ha.date) {
+                    const year = ha.date.split('-')[0];
+                    if (year && year.length === 4) {
+                        stats[year] = (stats[year] || 0) + 1;
+                    }
+                }
+            });
+
+            // Sort years descending
+            const sortedYears = Object.keys(stats).sort((a, b) => b - a);
+
+            // Populate table
+            const tbody = $('#salesStatisticsTable tbody');
+            tbody.empty();
+
+            if (sortedYears.length === 0) {
+                tbody.append('<tr><td colspan="2">데이터가 없습니다.</td></tr>');
+            } else {
+                sortedYears.forEach(year => {
+                    tbody.append(`
+                        <tr>
+                            <td style="padding: 12px;">${year}년</td>
+                            <td style="padding: 12px; font-weight: bold; color: var(--primary-color);">${stats[year]}개</td>
+                        </tr>
+                    `);
+                });
+            }
+
+            // Show modal
+            $('#salesStatisticsDialog').modal('show');
+
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+            alert('실적을 불러오는 중 오류가 발생했습니다: ' + error.message);
+        } finally {
+            $("#loader").hide();
         }
     });
 }

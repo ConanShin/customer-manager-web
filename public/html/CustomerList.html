@@ -3,6 +3,9 @@
 
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>스타키 고객 관리</title>
+    <link rel="icon" type="image/png" href="../favicon.png">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png">
     <script src="../lib/jquery-3.1.1.min.js"></script>
     <script src="../lib/bootstrap.min.js"></script>
     <script src="../lib/sorttable.js"></script>
@@ -39,6 +42,7 @@
                                 <input type="radio" name="buyRepair" id="option2" autocomplete="off" value="repair"> 수리
                             </label>
                         </div>
+                        <button id="btnSalesStats" type="button" class="btn btn-success">실적</button>
                     </div>
                     <div class="search-container">
                         <input type="text" id="filterInput" onkeyup="filterTable()" placeholder="검색어 입력">
@@ -234,10 +238,39 @@
                                             구입</label>
                                         <input type="date" name="batteryOrderDate" id="batteryOrderDateInput"
                                             class="form-control"
-                                            style="font-size:1.3rem; padding:4px 8px; width:100px;" />
+                                            style="font-size:1.3rem; padding:4px 8px; width:120px;" />
                                     </div>
                                     <!-- Dynamic List -->
                                     <div id="hearingAidList" class="hearing-aid-compact-list"></div>
+                                </div>
+
+                                <!-- Fitting Test Section -->
+                                <div class="fitting-test-section">
+                                    <div class="section-header">
+                                        <span class="section-title">적합 검사</span>
+                                    </div>
+                                    <div class="fitting-grid">
+                                        <div class="fitting-item">
+                                            <label>1차</label>
+                                            <input type="date" name="fittingTest1" class="form-control" />
+                                        </div>
+                                        <div class="fitting-item">
+                                            <label>2차</label>
+                                            <input type="date" name="fittingTest2" class="form-control" />
+                                        </div>
+                                        <div class="fitting-item">
+                                            <label>3차</label>
+                                            <input type="date" name="fittingTest3" class="form-control" />
+                                        </div>
+                                        <div class="fitting-item">
+                                            <label>4차</label>
+                                            <input type="date" name="fittingTest4" class="form-control" />
+                                        </div>
+                                        <div class="fitting-item">
+                                            <label>5차</label>
+                                            <input type="date" name="fittingTest5" class="form-control" />
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Memo -->
@@ -300,6 +333,33 @@
                     <div class="modal-footer">
                         <button id="btnAddRepairCustomer" class="btn btn-primary">저장</button>
                         <button id="btnDeleteRepairCustomer" class="btn btn-danger">삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sales Statistics Modal -->
+        <div id="salesStatisticsDialog" class="modal fade" role="dialog">
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">년도별 판매 실적</h3>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">닫기</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="datagrid">
+                            <table id="salesStatisticsTable" class="customersTable">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align: center;">년도</th>
+                                        <th style="text-align: center;">판매 개수</th>
+                                    </tr>
+                                </thead>
+                                <tbody style="text-align: center; font-size: 1.2rem;">
+                                    <!-- Data populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>

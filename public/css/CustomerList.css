@@ -301,6 +301,18 @@ table {
     color: white;
 }
 
+.btn-success {
+    background-color: #10b981;
+    /* Emerald 500 */
+    color: white;
+    border: none;
+}
+
+.btn-success:hover {
+    background-color: #059669;
+    /* Emerald 600 */
+}
+
 .btn-default {
     background-color: white;
     border-color: #d1d5db;
@@ -340,8 +352,12 @@ select:focus {
 /* Modal */
 .modal-dialog {
     width: 95%;
-    max-width: 850px;
+    max-width: 975px;
     /* Highly optimized width */
+}
+
+.modal-sm {
+    max-width: 400px;
 }
 
 .modal-content {
@@ -995,6 +1011,39 @@ select:focus {
 
 .btn-remove-mini:hover {
     color: var(--danger);
+}
+
+/* Fitting Test styles */
+.fitting-test-section {
+    background: #f0fdf4;
+    /* Subtle green */
+    border-radius: 6px;
+    padding: 10px;
+    border: 1px solid #dcfce7;
+    margin-top: 10px;
+}
+
+.fitting-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.fitting-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.fitting-item label {
+    font-size: 0.7rem;
+    color: var(--text-light);
+    margin-bottom: 2px;
+    text-align: center;
+}
+
+.fitting-item input {
+    font-size: 1rem;
+    padding: 2px 4px;
 }
 
 /* Memo */
