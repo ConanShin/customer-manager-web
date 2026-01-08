@@ -1023,6 +1023,7 @@ select:focus {
     margin-top: 10px;
 }
 
+
 .fitting-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -1032,7 +1033,10 @@ select:focus {
 .fitting-item {
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    /* Prevent grid items from overflowing */
 }
+
 
 .fitting-item label {
     font-size: 0.7rem;
@@ -1079,5 +1083,21 @@ select:focus {
     .ha-compact-item {
         flex-direction: row !important;
         align-items: center;
+    }
+
+    /* Fitting Grid Mobile Fix */
+    .fitting-grid {
+        grid-template-columns: repeat(2, 1fr);
+        /* 2 columns on mobile instead of 5 */
+        gap: 10px;
+    }
+
+    .fitting-item label {
+        text-align: left;
+    }
+
+    .fitting-item input {
+        font-size: 1.2rem;
+        padding: 6px;
     }
 }

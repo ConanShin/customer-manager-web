@@ -1179,58 +1179,355 @@ if (document.getElementById('profilePictureInput')) {
 }
 
 // Sales Statistics Logic
+let currentStatsView = 'yearly';
+let selectedStatsYear = null;
+let selectedStatsMonth = null;
+let salesChart = null;
+
 if (btnSalesStats) {
-    btnSalesStats.addEventListener('click', async () => {
-        $("#loader h4").text("실적 집계 중...");
-        $("#loader").css("display", "flex");
+    btnSalesStats.addEventListener('click', () => {
+        renderSalesStatsYearly();
+        $('#salesStatisticsDialog').modal('show');
+    });
+}
 
-        try {
-            // Fetch all hearing aids
-            const { data: hearingAids, error } = await _supabase
-                .from('hearing_aids')
-                .select('date');
+const btnBackStats = document.getElementById('btnBackStats');
+if (btnBackStats) {
+    btnBackStats.addEventListener('click', () => {
+        if (currentStatsView === 'monthly') {
+            renderSalesStatsYearly();
+        } else if (currentStatsView === 'customers') {
+            renderSalesStatsMonthly(selectedStatsYear);
+        }
+    });
+}
 
-            if (error) throw error;
+function updateStatsHeader(title, showBack) {
+    $('#salesStatsTitle').text(title);
+    if (showBack) $('#btnBackStats').show();
+    else $('#btnBackStats').hide();
+}
 
-            // Group by year
-            const stats = {};
-            hearingAids.forEach(ha => {
-                if (ha.date) {
-                    const year = ha.date.split('-')[0];
-                    if (year && year.length === 4) {
-                        stats[year] = (stats[year] || 0) + 1;
+async function fetchAllHearingAids(filterGte = null, filterLt = null) {
+    let allAids = [];
+    let from = 0;
+    let to = 999;
+    let keepFetching = true;
+
+    while (keepFetching) {
+        let query = _supabase
+            .from('hearing_aids')
+            .select(`
+                date,
+                side,
+                model,
+                customers (
+                    id,
+                    name,
+                    phone_number,
+                    mobile_phone_number
+                )
+            `)
+            .order('date', { ascending: false })
+            .range(from, to);
+
+        if (filterGte) query = query.gte('date', filterGte);
+        if (filterLt) query = query.lt('date', filterLt);
+
+        const { data, error } = await query;
+
+        if (error) {
+            console.error("Error fetching hearing aids:", error);
+            throw error;
+        }
+
+        if (data.length === 0) {
+            keepFetching = false;
+        } else {
+            allAids = allAids.concat(data);
+            if (data.length < 1000) {
+                keepFetching = false;
+            } else {
+                from += 1000;
+                to += 1000;
+            }
+        }
+    }
+    return allAids;
+}
+
+async function renderSalesStatsYearly() {
+    currentStatsView = 'yearly';
+    updateStatsHeader('년도별 판매 실적 (개수)', false);
+    $('#salesChartContainer').hide();
+    $('#salesStatsContainer').show();
+
+    $("#loader h4").text("실적 집계 중...");
+    $("#loader").css("display", "flex");
+
+    try {
+        const hearingAids = await fetchAllHearingAids();
+
+        const stats = {};
+        hearingAids.forEach(ha => {
+            if (ha.date) {
+                const year = ha.date.split('-')[0];
+                if (year && year.length === 4) {
+                    stats[year] = (stats[year] || 0) + 1;
+                }
+            }
+        });
+
+        const sortedYears = Object.keys(stats).sort((a, b) => b - a);
+        const tbody = $('#salesStatisticsTable tbody');
+        const thead = $('#salesStatisticsTable thead');
+
+        thead.empty().append('<tr><th style="text-align: center;">년도</th><th style="text-align: center;">판매 개수</th></tr>');
+        tbody.empty();
+
+        if (sortedYears.length === 0) {
+            tbody.append('<tr><td colspan="2">데이터가 없습니다.</td></tr>');
+        } else {
+            sortedYears.forEach(year => {
+                const row = $(`
+                    <tr style="cursor: pointer;">
+                        <td style="padding: 12px;">${year}년</td>
+                        <td style="padding: 12px; font-weight: bold; color: var(--primary-color);">${stats[year]}개</td>
+                    </tr>
+                `);
+                row.click(() => renderSalesStatsMonthly(year));
+                tbody.append(row);
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching stats:', error);
+        alert('실적을 불러오는 중 오류가 발생했습니다: ' + error.message);
+    } finally {
+        $("#loader").hide();
+    }
+}
+
+async function renderSalesStatsMonthly(year) {
+    currentStatsView = 'monthly';
+    selectedStatsYear = year;
+    updateStatsHeader(`${year}년 월별 실적 (개수)`, true);
+
+    $("#loader h4").text("월별 실적 집계 중...");
+    $("#loader").css("display", "flex");
+
+    try {
+        const hearingAids = await fetchAllHearingAids(`${year}-01-01`, `${parseInt(year) + 1}-01-01`);
+
+        $('#salesChartContainer').show();
+        $('#salesStatsContainer').hide(); // Hide table in monthly view as requested
+        const stats = {};
+        for (let i = 1; i <= 12; i++) {
+            stats[i] = 0;
+        }
+
+        hearingAids.forEach(ha => {
+            if (ha.date) {
+                const month = parseInt(ha.date.split('-')[1]);
+                if (month >= 1 && month <= 12) {
+                    stats[month]++;
+                }
+            }
+        });
+
+        const tbody = $('#salesStatisticsTable tbody');
+        const thead = $('#salesStatisticsTable thead');
+
+        thead.empty().append('<tr><th style="text-align: center;">월</th><th style="text-align: center;">판매 개수</th></tr>');
+        tbody.empty();
+
+        const chartLabels = [];
+        const chartData = [];
+
+        for (let month = 1; month <= 12; month++) {
+            chartLabels.push(`${month}월`);
+            chartData.push(stats[month]);
+        }
+
+        renderMonthlySalesChart(year, chartLabels, chartData);
+        $('#salesChartContainer').show();
+
+        for (let month = 12; month >= 1; month--) {
+            if (stats[month] > 0) {
+                const row = $(`
+                    <tr style="cursor: pointer;">
+                        <td style="padding: 12px;">${month}월</td>
+                        <td style="padding: 12px; font-weight: bold; color: var(--primary-color);">${stats[month]}개</td>
+                    </tr>
+                `);
+                row.click(() => renderSalesStatsCustomers(year, month));
+                tbody.append(row);
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching monthly stats:', error);
+    } finally {
+        $("#loader").hide();
+    }
+}
+
+async function renderSalesStatsCustomers(year, month) {
+    currentStatsView = 'customers';
+    selectedStatsMonth = month;
+    const formattedMonth = month < 10 ? '0' + month : month;
+    $('#salesChartContainer').hide();
+    $('#salesStatsContainer').show();
+
+    let nextYear = year;
+    let nextMonth = month + 1;
+    if (nextMonth > 12) {
+        nextMonth = 1;
+        nextYear = parseInt(year) + 1;
+    }
+    const formattedNextMonth = nextMonth < 10 ? '0' + nextMonth : nextMonth;
+
+    updateStatsHeader(`${year}년 ${month}월 구매 고객`, true);
+
+    $("#loader h4").text("고객 리스트 불러오는 중...");
+    $("#loader").css("display", "flex");
+
+    try {
+        const hearingAids = await fetchAllHearingAids(`${year}-${formattedMonth}-01`, `${nextYear}-${formattedNextMonth}-01`);
+
+        const tbody = $('#salesStatisticsTable tbody');
+        const thead = $('#salesStatisticsTable thead');
+
+        thead.empty().append('<tr><th style="text-align: center;">이름</th><th style="text-align: center;">구분</th><th style="text-align: center;">모델명</th><th style="text-align: center;">날짜</th></tr>');
+        tbody.empty();
+
+        if (!hearingAids || hearingAids.length === 0) {
+            tbody.append('<tr><td colspan="4">데이터가 없습니다.</td></tr>');
+        } else {
+            // Sort by date descending
+            hearingAids.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            hearingAids.forEach(item => {
+                const customer = item.customers;
+                if (!customer) return;
+
+                const sideKo = item.side === 'left' ? '좌' : '우';
+                const badgeCls = item.side === 'left' ? 'left' : 'right';
+
+                const row = $(`
+                    <tr style="cursor: pointer;">
+                        <td style="padding: 12px;">${customer.name}</td>
+                        <td style="padding: 12px; text-align: center;">
+                            <span class="ha-badge ${badgeCls}" style="width: 25px; padding: 2px 4px; font-size: 0.7rem;">${sideKo}</span>
+                        </td>
+                        <td style="padding: 12px; font-size: 0.9rem;">${item.model || '-'}</td>
+                        <td style="padding: 12px; font-size: 0.9rem;">${formatDate(item.date)}</td>
+                    </tr>
+                `);
+                row.click(() => {
+                    $('#salesStatisticsDialog').modal('hide');
+                    updateCustomer(customer.id);
+                });
+                tbody.append(row);
+            });
+        }
+    } finally {
+        $("#loader").hide();
+    }
+}
+
+function renderMonthlySalesChart(year, labels, data) {
+    const ctx = document.getElementById('salesMonthlyChart').getContext('2d');
+
+    if (salesChart) {
+        salesChart.destroy();
+    }
+
+    salesChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '판매 개수',
+                data: data,
+                backgroundColor: 'rgba(37, 99, 235, 0.7)',
+                borderColor: 'rgba(37, 99, 235, 1)',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+                    const month = index + 1;
+                    renderSalesStatsCustomers(year, month);
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return context.raw + '개';
+                        }
                     }
                 }
-            });
-
-            // Sort years descending
-            const sortedYears = Object.keys(stats).sort((a, b) => b - a);
-
-            // Populate table
-            const tbody = $('#salesStatisticsTable tbody');
-            tbody.empty();
-
-            if (sortedYears.length === 0) {
-                tbody.append('<tr><td colspan="2">데이터가 없습니다.</td></tr>');
-            } else {
-                sortedYears.forEach(year => {
-                    tbody.append(`
-                        <tr>
-                            <td style="padding: 12px;">${year}년</td>
-                            <td style="padding: 12px; font-weight: bold; color: var(--primary-color);">${stats[year]}개</td>
-                        </tr>
-                    `);
-                });
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grace: '10%', // Add padding at the top to prevent label clipping
+                    ticks: {
+                        stepSize: 1,
+                        font: {
+                            size: 14
+                        }
+                    },
+                    grid: {
+                        display: true,
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            animation: {
+                duration: 1000,
+                easing: 'easeOutQuart'
             }
+        },
+        plugins: [{
+            id: 'datalabels',
+            afterDraw: (chart) => {
+                const { ctx, data } = chart;
+                ctx.save();
+                ctx.fillStyle = '#1f2937';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.font = 'bold 14px Inter';
 
-            // Show modal
-            $('#salesStatisticsDialog').modal('show');
-
-        } catch (error) {
-            console.error('Error fetching stats:', error);
-            alert('실적을 불러오는 중 오류가 발생했습니다: ' + error.message);
-        } finally {
-            $("#loader").hide();
-        }
+                chart.data.datasets.forEach((dataset, i) => {
+                    chart.getDatasetMeta(i).data.forEach((bar, index) => {
+                        const val = dataset.data[index];
+                        if (val > 0) {
+                            ctx.fillText(val, bar.x, bar.y - 5);
+                        }
+                    });
+                });
+                ctx.restore();
+            }
+        }]
     });
 }

@@ -19,6 +19,8 @@
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" type="text/css" href="../css/CustomerList.css?v=20260102_1">
 </head>
 
@@ -340,20 +342,25 @@
 
         <!-- Sales Statistics Modal -->
         <div id="salesStatisticsDialog" class="modal fade" role="dialog">
-            <div class="modal-dialog modal-sm">
+            <div class="modal-dialog modal-md">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h3 class="modal-title">년도별 판매 실적</h3>
+                        <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
+                            <button id="btnBackStats" class="btn btn-default" style="padding: 5px 10px; display: none;">
+                                <i class="fa fa-chevron-left"></i>
+                            </button>
+                            <h3 class="modal-title" id="salesStatsTitle">년도별 판매 실적</h3>
+                        </div>
                         <button type="button" class="btn btn-default" data-dismiss="modal">닫기</button>
                     </div>
                     <div class="modal-body">
-                        <div class="datagrid">
+                        <div id="salesChartContainer" style="display: none; margin-bottom: 20px; height: 350px;">
+                            <canvas id="salesMonthlyChart"></canvas>
+                        </div>
+                        <div class="datagrid" id="salesStatsContainer" style="transition: all 0.3s ease;">
                             <table id="salesStatisticsTable" class="customersTable">
                                 <thead>
-                                    <tr>
-                                        <th style="text-align: center;">년도</th>
-                                        <th style="text-align: center;">판매 개수</th>
-                                    </tr>
+                                    <!-- Dynamic -->
                                 </thead>
                                 <tbody style="text-align: center; font-size: 1.2rem;">
                                     <!-- Data populated by JS -->
