@@ -32,6 +32,7 @@ let sevenWeekTable = document.getElementById("sevenWeek").getElementsByTagName("
 let oneYearTable = document.getElementById("oneYear").getElementsByTagName("table")[0];
 let twoYearTable = document.getElementById("twoYear").getElementsByTagName("table")[0];
 let fiveYearTable = document.getElementById("fiveYear").getElementsByTagName("table")[0];
+let fittingDueTable = document.getElementById("fittingDue").getElementsByTagName("table")[0];
 let newCustomerForm = $('.newCustomerForm');
 let newRepairForm = $('.repairCustomerForm');
 
@@ -293,6 +294,7 @@ async function loadCustomers() {
     var oneYearTableBody = clearTableAndReturn(oneYearTable);
     var twoYearTableBody = clearTableAndReturn(twoYearTable);
     var fiveYearTableBody = clearTableAndReturn(fiveYearTable);
+    var fittingDueTableBody = clearTableAndReturn(fittingDueTable);
 
     renderHeaders(oneWeekTable, yearColumns);
     renderHeaders(threeWeekTable, yearColumns);
@@ -300,6 +302,7 @@ async function loadCustomers() {
     renderHeaders(oneYearTable, yearColumns);
     renderHeaders(twoYearTable, yearColumns);
     renderHeaders(fiveYearTable, yearColumns);
+    renderHeaders(fittingDueTable, ["이름", "사진", "", "연락처", "최근 적합검사일", "모델명"]);
 
     const purchaseCustomers = customers.filter(c => c.hearingAid && c.hearingAid.length > 0);
 
@@ -310,10 +313,12 @@ async function loadCustomers() {
         sevenWeek: [],
         oneYear: [],
         twoYear: [],
-        fiveYear: []
+        fiveYear: [],
+        fittingDue: []
     };
 
-    purchaseCustomers.forEach(function (customerData) {
+    customers.forEach(function (customerData) {
+        // 1. Hearing Aid Purchase Hits (Buckets: 1w, 3w, 7w, 1y, 2y, 5y)
         if (customerData.hearingAid && customerData.hearingAid.length > 0) {
             let hits = {
                 oneWeek: [],
@@ -343,10 +348,38 @@ async function loadCustomers() {
                 }
             }
         }
+
+        // 2. Fitting Test Check (Always run for all customers)
+        const fittingDates = [
+            customerData.fittingTest1,
+            customerData.fittingTest2,
+            customerData.fittingTest3,
+            customerData.fittingTest4,
+            customerData.fittingTest5
+        ].filter(d => d).map(d => new Date(d));
+
+        if (fittingDates.length > 0) {
+            const latestFitting = new Date(Math.max(...fittingDates));
+            const oneYearAgoTime = new Date();
+            oneYearAgoTime.setFullYear(oneYearAgoTime.getFullYear() - 1);
+
+            if (latestFitting < oneYearAgoTime) {
+                const y = latestFitting.getFullYear();
+                const m = String(latestFitting.getMonth() + 1).padStart(2, '0');
+                const d = String(latestFitting.getDate()).padStart(2, '0');
+                const formattedLatestDate = `${y}/${m}/${d}`;
+
+                buckets.fittingDue.push({
+                    customer: customerData,
+                    date: formattedLatestDate,
+                    aids: customerData.hearingAid || []
+                });
+            }
+        }
     });
 
     // Helper to render bucket items
-    function renderBucketTable(tableBody, items) {
+    function renderBucketTable(tableBody, items, dateLabel = "구입일", dateField = null) {
         items.forEach(item => {
             let customerData = item.customer;
             let aids = item.aids;
@@ -360,7 +393,7 @@ async function loadCustomers() {
             row.insertCell(0).innerHTML = customerData.name;
             row.cells[0].setAttribute('data-label', '이름');
 
-            // Profile Picture (Constructed from ID)
+            // Profile Picture
             let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media&t=${customerData.updatedAt ? new Date(customerData.updatedAt).getTime() : ''}`;
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
@@ -379,7 +412,7 @@ async function loadCustomers() {
                 iconHtml += '</span>';
             }
             row.insertCell(2).innerHTML = iconHtml;
-            row.cells[2].setAttribute('data-label', ''); // Icon needs no label or specific handling
+            row.cells[2].setAttribute('data-label', '');
 
             // Contact
             let contactInfo = "";
@@ -392,11 +425,12 @@ async function loadCustomers() {
             row.insertCell(3).innerHTML = contactInfo;
             row.cells[3].setAttribute('data-label', '연락처');
 
-            // Date (Use first match)
-            row.insertCell(4).innerHTML = aids[0].date || "";
-            row.cells[4].setAttribute('data-label', '구입일');
+            // Date
+            let displayDate = dateField ? item[dateField] : (aids[0] ? aids[0].date : "");
+            row.insertCell(4).innerHTML = displayDate;
+            row.cells[4].setAttribute('data-label', dateLabel);
 
-            // Model (Join unique)
+            // Model
             let models = [...new Set(aids.map(ha => ha.model))].join(', ');
             row.insertCell(5).innerHTML = models;
             row.cells[5].setAttribute('data-label', '모델명');
@@ -409,6 +443,7 @@ async function loadCustomers() {
     renderBucketTable(oneYearTableBody, buckets.oneYear);
     renderBucketTable(twoYearTableBody, buckets.twoYear);
     renderBucketTable(fiveYearTableBody, buckets.fiveYear);
+    renderBucketTable(fittingDueTableBody, buckets.fittingDue, "최근 적합검사일", "date");
 
     sorttable.makeSortable(customerListTable);
 
