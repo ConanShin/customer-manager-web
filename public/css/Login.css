@@ -26,13 +26,34 @@ body {
     text-align: center;
 }
 
+.login-logo {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 1rem;
+    background-color: #2563eb;
+    -webkit-mask-image: url('../images/ear.svg');
+    mask-image: url('../images/ear.svg');
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+}
+
 .login h1 {
     color: #111827;
-    margin-bottom: 2rem;
-    font-size: 2rem;
+    margin-bottom: 0.25rem;
+    font-size: 1.75rem;
     font-weight: 700;
     letter-spacing: -0.025em;
     text-shadow: none;
+}
+
+.login-subtitle {
+    color: #6b7280;
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
 }
 
 input {
@@ -76,6 +97,11 @@ input:focus {
 
 .btn:active {
     background-color: #1e40af;
+}
+
+.btn:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.4);
+    outline-offset: 2px;
 }
 
 /* Helper for blocking */

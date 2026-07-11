@@ -25,6 +25,16 @@ btnLogin.addEventListener('click', async e => {
 	}
 });
 
+// Enter 키로 로그인 (이메일/비밀번호 입력창 모두에서 동작)
+[txtEmail, txtPassword].forEach(function (el) {
+	el.addEventListener('keydown', function (e) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			btnLogin.click();
+		}
+	});
+});
+
 _supabase.auth.onAuthStateChange((event, session) => {
 	if (session) {
 		location.replace("/html/CustomerList.html");

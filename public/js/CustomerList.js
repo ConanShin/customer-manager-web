@@ -1,3 +1,6 @@
+// Mock Mode (development/testing): enable with ?mock=1
+const MOCK_MODE = new URLSearchParams(location.search).get('mock') === '1';
+
 // Supabase Config
 const supabaseUrl = 'https://hooiszyapcowfyccwpoi.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhvb2lzenlhcGNvd2Z5Y2N3cG9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMzYwMDcsImV4cCI6MjA4MjYxMjAwN30.nc-Ri_Rh8anM4LhsvpWHxvUiyKj0Is7FJ438ptZOR-Q';
@@ -33,6 +36,7 @@ let oneYearTable = document.getElementById("oneYear").getElementsByTagName("tabl
 let twoYearTable = document.getElementById("twoYear").getElementsByTagName("table")[0];
 let fiveYearTable = document.getElementById("fiveYear").getElementsByTagName("table")[0];
 let fittingDueTable = document.getElementById("fittingDue").getElementsByTagName("table")[0];
+let fittingOver5YearTable = document.getElementById("fittingOver5Year").getElementsByTagName("table")[0];
 let newCustomerForm = $('.newCustomerForm');
 let newRepairForm = $('.repairCustomerForm');
 
@@ -57,6 +61,9 @@ let updateCustomerId = "";
 _supabase.auth.onAuthStateChange((event, session) => {
     if (session) {
         console.log("Welcome " + session.user.email);
+    } else if (MOCK_MODE) {
+        // Mock 모드에서는 로그인 리다이렉트를 건너뜁니다.
+        console.log("MOCK MODE: skipping login redirect");
     } else {
         location.replace("/html/Login.html");
     }
@@ -171,6 +178,62 @@ function renderHeaders(table, cols) {
     });
 }
 
+// Escape user data before interpolating into innerHTML (XSS-safe)
+function escapeHtml(str) {
+    if (str == null) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// 이름 기반 파스텔 아바타 색상 (부드러운 배경 + 읽기 쉬운 진한 글자색)
+const AVATAR_PALETTE = [
+    { bg: '#dbeafe', fg: '#1e40af' }, // blue
+    { bg: '#dcfce7', fg: '#166534' }, // green
+    { bg: '#fef3c7', fg: '#92400e' }, // amber
+    { bg: '#fce7f3', fg: '#9d174d' }, // pink
+    { bg: '#ede9fe', fg: '#5b21b6' }, // violet
+    { bg: '#cffafe', fg: '#155e75' }, // cyan
+    { bg: '#ffedd5', fg: '#9a3412' }, // orange
+    { bg: '#e0e7ff', fg: '#3730a3' }  // indigo
+];
+
+// 이름의 문자 코드를 해싱해 항상 같은 색 조합을 돌려줍니다 (안정적/전문적).
+function avatarColorFor(name) {
+    let str = String(name == null ? '' : name);
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+    }
+    return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
+}
+
+// Build a lowercase search index string for a customer row (name, phones raw + digits-only, address, models, last repair)
+function buildSearchIndex(customerData) {
+    let parts = [];
+    let digitsOnly = function (x) { return String(x == null ? "" : x).replace(/\D/g, ''); };
+
+    if (customerData.name) parts.push(customerData.name);
+    if (customerData.phoneNumber) {
+        parts.push(customerData.phoneNumber);
+        parts.push(digitsOnly(customerData.phoneNumber));
+    }
+    if (customerData.mobilePhoneNumber) {
+        parts.push(customerData.mobilePhoneNumber);
+        parts.push(digitsOnly(customerData.mobilePhoneNumber));
+    }
+    if (customerData.address) parts.push(customerData.address);
+    if (customerData.hearingAid && customerData.hearingAid.length > 0) {
+        customerData.hearingAid.forEach(function (ha) {
+            if (ha.model) parts.push(ha.model);
+        });
+    }
+    if (customerData.repairReport && customerData.repairReport.length > 0) {
+        let lastRepair = customerData.repairReport[customerData.repairReport.length - 1];
+        if (lastRepair && lastRepair.content) parts.push(lastRepair.content);
+    }
+
+    return parts.join(" ").toLowerCase();
+}
+
 // Data Mapping
 const mapCustomerFromDb = (dbCustomer) => {
     let birthDate = formatDate(dbCustomer.birth_date);
@@ -245,43 +308,53 @@ const mapCustomerToDb = (uiCustomer) => {
 async function loadCustomers() {
     $("#loader h4").text("데이터 불러오는 중...");
     $("#loader").css("display", "flex");
-    let allData = [];
-    let from = 0;
-    let to = 999;
-    let keepFetching = true;
 
-    while (keepFetching) {
-        const { data: customersDb, error } = await _supabase
-            .from('customers')
-            .select(`*, hearing_aids(*), repairs(*)`)
-            .order('updated_at', { ascending: false, nullsFirst: false })
-            .range(from, to);
+    let customers;
 
-        if (error) {
-            console.error("Error loading customers:", error);
-            alert("Error loading data");
-            $("#loader").hide();
-            return;
-        }
+    if (MOCK_MODE) {
+        // Mock 모드: Supabase 대신 로컬 목 데이터 사용 (이미 UI 형태로 매핑됨)
+        customers = getMockCustomers();
+        allCustomers = customers;
+        console.log("MOCK MODE: Loaded mock customers:", customers.length);
+    } else {
+        let allData = [];
+        let from = 0;
+        let to = 999;
+        let keepFetching = true;
 
-        if (customersDb.length === 0) {
-            keepFetching = false;
-        } else {
-            allData = allData.concat(customersDb);
-            from += 1000;
-            to += 1000;
-            // Optional: Break if fetched less than limit, meaning we reached the end
-            if (customersDb.length < 1000) {
+        while (keepFetching) {
+            const { data: customersDb, error } = await _supabase
+                .from('customers')
+                .select(`*, hearing_aids(*), repairs(*)`)
+                .order('updated_at', { ascending: false, nullsFirst: false })
+                .range(from, to);
+
+            if (error) {
+                console.error("Error loading customers:", error);
+                alert("Error loading data");
+                $("#loader").hide();
+                return;
+            }
+
+            if (customersDb.length === 0) {
                 keepFetching = false;
+            } else {
+                allData = allData.concat(customersDb);
+                from += 1000;
+                to += 1000;
+                // Optional: Break if fetched less than limit, meaning we reached the end
+                if (customersDb.length < 1000) {
+                    keepFetching = false;
+                }
             }
         }
-    }
 
-    // Use the accumulated data
-    const customers = allData.map(mapCustomerFromDb);
-    allCustomers = customers; // Store correctly
-    console.log("Fetched Total Customers:", allData.length);
-    console.log("Mapped Customers:", customers);
+        // Use the accumulated data
+        customers = allData.map(mapCustomerFromDb);
+        allCustomers = customers; // Store correctly
+        console.log("Fetched Total Customers:", allData.length);
+        console.log("Mapped Customers:", customers);
+    }
 
     // Customer List Table
     var customerListTableBody = customerListTable.getElementsByTagName("tbody")[0];
@@ -295,6 +368,7 @@ async function loadCustomers() {
     var twoYearTableBody = clearTableAndReturn(twoYearTable);
     var fiveYearTableBody = clearTableAndReturn(fiveYearTable);
     var fittingDueTableBody = clearTableAndReturn(fittingDueTable);
+    var fittingOver5YearTableBody = clearTableAndReturn(fittingOver5YearTable);
 
     renderHeaders(oneWeekTable, yearColumns);
     renderHeaders(threeWeekTable, yearColumns);
@@ -303,6 +377,7 @@ async function loadCustomers() {
     renderHeaders(twoYearTable, yearColumns);
     renderHeaders(fiveYearTable, yearColumns);
     renderHeaders(fittingDueTable, ["이름", "사진", "", "연락처", "최근 적합검사일", "모델명"]);
+    renderHeaders(fittingOver5YearTable, ["이름", "사진", "", "연락처", "1차 적합검사일", "모델명"]);
 
     const purchaseCustomers = customers.filter(c => c.hearingAid && c.hearingAid.length > 0);
 
@@ -314,8 +389,13 @@ async function loadCustomers() {
         oneYear: [],
         twoYear: [],
         fiveYear: [],
-        fittingDue: []
+        fittingDue: [],
+        fittingOver5Year: []
     };
+
+    // 1차 적합검사(fittingTest1)가 오늘 기준 5년보다 이전인 고객 판별 기준일
+    const fittingOver5YearThreshold = new Date();
+    fittingOver5YearThreshold.setFullYear(fittingOver5YearThreshold.getFullYear() - 5);
 
     customers.forEach(function (customerData) {
         // 1. Hearing Aid Purchase Hits (Buckets: 1w, 3w, 7w, 1y, 2y, 5y)
@@ -376,6 +456,23 @@ async function loadCustomers() {
                 });
             }
         }
+
+        // 3. 1차 적합검사(fittingTest1)가 5년보다 이전인 고객
+        if (!isNull(customerData.fittingTest1)) {
+            let firstFittingDate = new Date(customerData.fittingTest1);
+            if (!isNaN(firstFittingDate.getTime()) && firstFittingDate < fittingOver5YearThreshold) {
+                buckets.fittingOver5Year.push({
+                    customer: customerData,
+                    date: customerData.fittingTest1,
+                    aids: customerData.hearingAid || []
+                });
+            }
+        }
+    });
+
+    // 5년 경과 고객: 1차 적합검사일 오름차순 (가장 오래된/도래한 순)
+    buckets.fittingOver5Year.sort(function (a, b) {
+        return new Date(a.date) - new Date(b.date);
     });
 
     // Helper to render bucket items
@@ -390,15 +487,15 @@ async function loadCustomers() {
             row.setAttribute('onclick', 'updateCustomer(\'' + customerData.id + '\')');
 
             // Name
-            row.insertCell(0).innerHTML = customerData.name;
+            row.insertCell(0).innerHTML = escapeHtml(customerData.name);
             row.cells[0].setAttribute('data-label', '이름');
 
             // Profile Picture
             let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media&t=${customerData.updatedAt ? new Date(customerData.updatedAt).getTime() : ''}`;
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
-                <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
-                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${[...customerData.name][0] || '?'}</div>
+                <img src="${profileUrl}" class="profile-avatar-small" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
+                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0; background-color:${avatarColorFor(customerData.name).bg}; color:${avatarColorFor(customerData.name).fg};">${escapeHtml([...(customerData.name || '')][0] || '?')}</div>
             </div>`;
             row.insertCell(1).innerHTML = imgHtml;
             row.cells[1].setAttribute('data-label', '사진');
@@ -417,22 +514,22 @@ async function loadCustomers() {
             // Contact
             let contactInfo = "";
             if (customerData.phoneNumber) {
-                contactInfo += '<div><i class="fa fa-phone"></i> <a href="tel:' + customerData.phoneNumber + '" onclick="event.stopPropagation()">' + customerData.phoneNumber + '</a></div>';
+                contactInfo += '<div><i class="fa fa-phone"></i> <a href="tel:' + encodeURIComponent(customerData.phoneNumber) + '" onclick="event.stopPropagation()">' + escapeHtml(customerData.phoneNumber) + '</a></div>';
             }
             if (customerData.mobilePhoneNumber) {
-                contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + customerData.mobilePhoneNumber + '" onclick="event.stopPropagation()">' + customerData.mobilePhoneNumber + '</a></div>';
+                contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + encodeURIComponent(customerData.mobilePhoneNumber) + '" onclick="event.stopPropagation()">' + escapeHtml(customerData.mobilePhoneNumber) + '</a></div>';
             }
             row.insertCell(3).innerHTML = contactInfo;
             row.cells[3].setAttribute('data-label', '연락처');
 
             // Date
             let displayDate = dateField ? item[dateField] : (aids[0] ? aids[0].date : "");
-            row.insertCell(4).innerHTML = displayDate;
+            row.insertCell(4).innerHTML = escapeHtml(displayDate);
             row.cells[4].setAttribute('data-label', dateLabel);
 
             // Model
             let models = [...new Set(aids.map(ha => ha.model))].join(', ');
-            row.insertCell(5).innerHTML = models;
+            row.insertCell(5).innerHTML = escapeHtml(models);
             row.cells[5].setAttribute('data-label', '모델명');
         });
     }
@@ -444,11 +541,16 @@ async function loadCustomers() {
     renderBucketTable(twoYearTableBody, buckets.twoYear);
     renderBucketTable(fiveYearTableBody, buckets.fiveYear);
     renderBucketTable(fittingDueTableBody, buckets.fittingDue, "최근 적합검사일", "date");
+    renderBucketTable(fittingOver5YearTableBody, buckets.fittingOver5Year, "1차 적합검사일", "date");
 
     sorttable.makeSortable(customerListTable);
 
     // Initial Render
     renderCustomerList();
+
+    // Update notice-section counts / empty states / mobile badge (idempotent)
+    refreshNoticeSections();
+
     $("#loader").hide();
 }
 
@@ -479,6 +581,7 @@ function renderCustomerList() {
         filteredCustomers.forEach(function (customerData) {
             var bodyRow = repairCustomerListTableBody.insertRow(repairCustomerListTableBody.rows.length);
             bodyRow.setAttribute('onclick', 'updateRepairCustomer(\'' + customerData.id + '\')');
+            bodyRow.dataset.search = buildSearchIndex(customerData);
             var hasLeft = false;
             var hasRight = false;
             if (customerData.hearingAid && customerData.hearingAid.length > 0) {
@@ -495,15 +598,15 @@ function renderCustomerList() {
                 iconHtml += '</span>';
             }
 
-            bodyRow.insertCell(0).innerHTML = customerData.name;
+            bodyRow.insertCell(0).innerHTML = escapeHtml(customerData.name);
             bodyRow.cells[0].setAttribute('data-label', '이름');
 
             // Profile Picture (Constructed from ID)
             let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media&t=${customerData.updatedAt ? new Date(customerData.updatedAt).getTime() : ''}`;
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
-                <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
-                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${[...customerData.name][0] || '?'}</div>
+                <img src="${profileUrl}" class="profile-avatar-small" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
+                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0; background-color:${avatarColorFor(customerData.name).bg}; color:${avatarColorFor(customerData.name).fg};">${escapeHtml([...(customerData.name || '')][0] || '?')}</div>
             </div>`;
             bodyRow.insertCell(1).innerHTML = imgHtml;
             bodyRow.cells[1].setAttribute('data-label', '사진');
@@ -517,10 +620,10 @@ function renderCustomerList() {
             // Last repair content
             let contactInfo = "";
             if (customerData.phoneNumber) {
-                contactInfo += '<div><i class="fa fa-phone"></i> <a href="tel:' + customerData.phoneNumber + '" onclick="event.stopPropagation()">' + customerData.phoneNumber + '</a></div>';
+                contactInfo += '<div><i class="fa fa-phone"></i> <a href="tel:' + encodeURIComponent(customerData.phoneNumber) + '" onclick="event.stopPropagation()">' + escapeHtml(customerData.phoneNumber) + '</a></div>';
             }
             if (customerData.mobilePhoneNumber) {
-                contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + customerData.mobilePhoneNumber + '" onclick="event.stopPropagation()">' + customerData.mobilePhoneNumber + '</a></div>';
+                contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + encodeURIComponent(customerData.mobilePhoneNumber) + '" onclick="event.stopPropagation()">' + escapeHtml(customerData.mobilePhoneNumber) + '</a></div>';
             }
             bodyRow.insertCell(3).innerHTML = contactInfo;
             bodyRow.cells[3].setAttribute('data-label', '연락처');
@@ -530,7 +633,7 @@ function renderCustomerList() {
             if (customerData.repairReport && customerData.repairReport.length > 0) {
                 lastRepair = customerData.repairReport[customerData.repairReport.length - 1].content;
             }
-            bodyRow.insertCell(4).innerHTML = lastRepair;
+            bodyRow.insertCell(4).innerHTML = escapeHtml(lastRepair);
             bodyRow.cells[4].setAttribute('data-label', '최근 수리내역');
         });
     } else {
@@ -542,6 +645,7 @@ function renderCustomerList() {
         filteredCustomers.forEach(function (customerData) {
             var bodyRow = customerListTableBody.insertRow(customerListTableBody.rows.length);
             bodyRow.setAttribute('onclick', 'updateCustomer(\'' + customerData.id + '\')');
+            bodyRow.dataset.search = buildSearchIndex(customerData);
             var hasLeft = false;
             var hasRight = false;
             if (customerData.hearingAid && customerData.hearingAid.length > 0) {
@@ -558,15 +662,15 @@ function renderCustomerList() {
                 iconHtml += '</span>';
             }
 
-            bodyRow.insertCell(0).innerHTML = customerData.name;
+            bodyRow.insertCell(0).innerHTML = escapeHtml(customerData.name);
             bodyRow.cells[0].setAttribute('data-label', '이름');
 
             // Profile Picture (Constructed from ID)
             let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${customerData.id}?alt=media&t=${customerData.updatedAt ? new Date(customerData.updatedAt).getTime() : ''}`;
             let imgHtml = `
             <div class="profile-wrapper" style="position:relative; width:40px; height:40px;">
-                <img src="${profileUrl}" class="profile-avatar-small" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
-                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0;">${[...customerData.name][0] || '?'}</div>
+                <img src="${profileUrl}" class="profile-avatar-small" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display:block;"/>
+                <div class="profile-avatar-placeholder-small" style="display:none; position:absolute; top:0; left:0; background-color:${avatarColorFor(customerData.name).bg}; color:${avatarColorFor(customerData.name).fg};">${escapeHtml([...(customerData.name || '')][0] || '?')}</div>
             </div>`;
             bodyRow.insertCell(1).innerHTML = imgHtml;
             bodyRow.cells[1].setAttribute('data-label', '사진');
@@ -577,15 +681,15 @@ function renderCustomerList() {
             // Removed Registration Date
             let contactInfo = "";
             if (customerData.phoneNumber) {
-                contactInfo += '<div><i class="fa fa-phone"></i> <a href="tel:' + customerData.phoneNumber + '" onclick="event.stopPropagation()">' + customerData.phoneNumber + '</a></div>';
+                contactInfo += '<div><i class="fa fa-phone"></i> <a href="tel:' + encodeURIComponent(customerData.phoneNumber) + '" onclick="event.stopPropagation()">' + escapeHtml(customerData.phoneNumber) + '</a></div>';
             }
             if (customerData.mobilePhoneNumber) {
-                contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + customerData.mobilePhoneNumber + '" onclick="event.stopPropagation()">' + customerData.mobilePhoneNumber + '</a></div>';
+                contactInfo += '<div><i class="fa fa-mobile"></i> <a href="tel:' + encodeURIComponent(customerData.mobilePhoneNumber) + '" onclick="event.stopPropagation()">' + escapeHtml(customerData.mobilePhoneNumber) + '</a></div>';
             }
             bodyRow.insertCell(3).innerHTML = contactInfo;
             bodyRow.cells[3].setAttribute('data-label', '연락처');
 
-            bodyRow.insertCell(4).innerHTML = customerData.address || "";
+            bodyRow.insertCell(4).innerHTML = escapeHtml(customerData.address || "");
             bodyRow.cells[4].setAttribute('data-label', '주소');
         });
     }
@@ -603,49 +707,161 @@ function renderCustomerList() {
 // Event Listeners & UI Logic
 // Event Listeners related to filtering
 let clearFilter = function () {
-    document.getElementById("filterInput").value = "";
+    let input = document.getElementById("filterInput");
+    input.value = "";
+    let wrap = input.closest('.search-input-wrap');
+    if (wrap) wrap.classList.remove('has-text');
     filterTable();
 }
 
 let filterTable = function () {
-    let filter, tr, td, i, count, listTable;
-    filter = document.getElementById("filterInput").value;
+    let q = document.getElementById("filterInput").value.trim().toLowerCase();
+    let qDigits = q.replace(/\D/g, '');
 
     let filterType = $("input:radio[name='buyRepair']:checked").val();
-    listTable = filterType == 'repair' ? repairCustomerListTable : customerListTable;
+    let listTable = filterType == 'repair' ? repairCustomerListTable : customerListTable;
 
-    tr = listTable.getElementsByTagName("tr");
-    count = 0;
+    let tbody = listTable.getElementsByTagName("tbody")[0];
+    let rows = tbody ? tbody.getElementsByTagName("tr") : [];
+    let count = 0;
 
-    for (i = 0; i < tr.length; i++) {
-        // Skip header
-        if (tr[i].parentNode.tagName === 'THEAD') continue;
+    for (let i = 0; i < rows.length; i++) {
+        let row = rows[i];
+        let index = row.dataset.search;
 
-        let found = false;
-        for (j = 0; j < 6; j++) {
-            td = tr[i].getElementsByTagName("td")[j];
-            if (td) {
-                if (td.innerHTML.indexOf(filter) > -1) {
-                    found = true;
-                    break;
-                }
-            }
+        let matched;
+        if (q === "") {
+            // Empty query matches every row (even rows without a search index)
+            matched = true;
+        } else if (index == null) {
+            // Rows without dataset.search only match on empty query
+            matched = false;
+        } else {
+            matched = index.includes(q) || (qDigits.length >= 3 && index.includes(qDigits));
         }
 
-        if (found) {
-            tr[i].style.display = "";
+        if (matched) {
+            row.style.display = "";
             count++;
             if (count % 10 == 0) {
-                tr[i].className = "highlight";
+                row.className = "highlight";
             } else {
-                tr[i].className = "";
+                row.className = "";
             }
         } else {
-            tr[i].style.display = "none";
+            row.style.display = "none";
         }
     }
     $("#customerCount")[0].innerHTML = count;
 }
+
+// ── Notice sections & mobile navigation ──────────────────────────────
+// Order matters only for readability; ids match the 8 notice sections.
+const NOTICE_SECTION_IDS = [
+    'fittingOver5Year', 'oneWeek', 'threeWeek', 'sevenWeek',
+    'oneYear', 'twoYear', 'fiveYear', 'fittingDue'
+];
+
+// 모바일 칩 내비게이션용 짧은 섹션 제목
+const NOTICE_SHORT_TITLES = {
+    fittingOver5Year: '5년경과',
+    oneWeek: '1주차',
+    threeWeek: '3주차',
+    sevenWeek: '7주차',
+    oneYear: '1년차',
+    twoYear: '2년차',
+    fiveYear: '5년차',
+    fittingDue: '적합검사'
+};
+
+// Count rows per notice section, write the count badge, toggle empty state,
+// rebuild the mobile chip navigation, and update the "정기 관리" tab badge.
+// Idempotent: safe to call after every loadCustomers().
+function refreshNoticeSections() {
+    let total = 0;
+    let chipsHtml = '';
+    NOTICE_SECTION_IDS.forEach(function (id) {
+        let section = document.getElementById(id);
+        if (!section) return;
+        let tbody = section.getElementsByTagName('tbody')[0];
+        let count = tbody ? tbody.rows.length : 0;
+        total += count;
+
+        let badge = section.querySelector('.notice-count-badge');
+        if (badge) badge.textContent = count;
+
+        section.classList.toggle('is-empty', count === 0);
+
+        chipsHtml += '<button type="button" class="notice-chip'
+            + (count === 0 ? ' is-zero' : '')
+            + (section.classList.contains('urgent') ? ' is-urgent' : '')
+            + '" onclick="scrollToNoticeSection(\'' + id + '\')">'
+            + (NOTICE_SHORT_TITLES[id] || id)
+            + ' <span class="chip-count">' + count + '</span></button>';
+    });
+
+    let chipBar = document.getElementById('noticeChipBar');
+    if (chipBar) chipBar.innerHTML = chipsHtml;
+
+    let tabBadge = document.getElementById('mobileNoticeBadge');
+    if (tabBadge) {
+        tabBadge.textContent = total;
+        tabBadge.style.display = total > 0 ? '' : 'none';
+    }
+}
+
+// 칩 탭 → 해당 섹션으로 스크롤 (접혀 있으면 먼저 펼침)
+function scrollToNoticeSection(id) {
+    let section = document.getElementById(id);
+    if (!section) return;
+    if (section.classList.contains('collapsed')) {
+        section.classList.remove('collapsed');
+        let header = section.querySelector('.notice-header');
+        if (header) header.setAttribute('aria-expanded', 'true');
+    }
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Collapse / expand a notice section (chevron rotates via CSS).
+function toggleNoticeSection(headerEl) {
+    let section = headerEl.closest('.notice-section');
+    if (!section) return;
+    let collapsed = section.classList.toggle('collapsed');
+    headerEl.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+
+// Switch the visible column on mobile (<900px). No effect at desktop widths
+// because the CSS rules that consume `mobile-show-notice` are media-scoped.
+function switchMobileTab(tab) {
+    document.body.classList.toggle('mobile-show-notice', tab === 'notice');
+    document.querySelectorAll('#mobileTabBar .mobile-tab').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    window.scrollTo(0, 0);
+}
+
+// UI wiring for the search box + keyboard support for notice headers.
+(function initUiEnhancements() {
+    let input = document.getElementById('filterInput');
+    if (input) {
+        let wrap = input.closest('.search-input-wrap');
+        let syncClear = function () {
+            if (wrap) wrap.classList.toggle('has-text', input.value.length > 0);
+        };
+        input.addEventListener('input', syncClear);
+        syncClear();
+    }
+
+    // Notice headers are keyboard-operable (Enter / Space) as button-like rows.
+    document.querySelectorAll('.notice-header').forEach(function (header) {
+        header.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                toggleNoticeSection(header);
+            }
+        });
+    });
+})();
 
 btnBuyRepair.change(function () {
     renderCustomerList();
@@ -740,6 +956,7 @@ let getFormObjectFromForm = function (form) {
 
 // Add/Update Customer
 btnAddCustomer.addEventListener('click', async e => {
+    if (MOCK_MODE) { alert("Mock 모드에서는 저장/삭제되지 않습니다"); return; }
     var customerData = getFormObjectFromForm(newCustomerForm);
     var emptyMsg = "";
     customerData.hearingAid = [];
@@ -883,6 +1100,7 @@ btnAddCustomer.addEventListener('click', async e => {
 // So, "Repair Customer" is just a Customer with a focus on repairs.
 
 btnAddRepairCustomer.addEventListener('click', async e => {
+    if (MOCK_MODE) { alert("Mock 모드에서는 저장/삭제되지 않습니다"); return; }
     var customerData = getFormObjectFromForm(newRepairForm);
     var emptyMsg = "";
     customerData.repairList = [];
@@ -957,6 +1175,7 @@ btnAddRepairCustomer.addEventListener('click', async e => {
 });
 
 btnDeleteCustomer.addEventListener('click', async e => {
+    if (MOCK_MODE) { alert("Mock 모드에서는 저장/삭제되지 않습니다"); return; }
     var confirmVal = confirm("정말 삭제하시겠습니까?");
     if (confirmVal == true) {
         $("#loader h4").text("삭제 중...");
@@ -984,6 +1203,7 @@ btnDeleteCustomer.addEventListener('click', async e => {
 });
 
 btnDeleteRepairCustomer.addEventListener('click', async e => {
+    if (MOCK_MODE) { alert("Mock 모드에서는 저장/삭제되지 않습니다"); return; }
     var confirmVal = confirm("정말 삭제하시겠습니까?");
     if (confirmVal == true) {
         $("#loader h4").text("삭제 중...");
@@ -1022,11 +1242,17 @@ let updateCustomer = async function (customerId) {
         btnDeleteCustomer.disabled = false;
         updateCustomerId = customerId;
 
-        // We can fetch fresh or find in loaded list. Let's fetch fresh for safety.
-        const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
-        if (error) { console.error(error); return; }
-
-        let c = mapCustomerFromDb(data);
+        let c;
+        if (MOCK_MODE) {
+            // Mock 모드: allCustomers에서 이미 UI 형태로 매핑된 고객을 찾습니다.
+            c = allCustomers.find(cust => cust.id === customerId);
+            if (!c) { console.error("Mock customer not found:", customerId); return; }
+        } else {
+            // We can fetch fresh or find in loaded list. Let's fetch fresh for safety.
+            const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
+            if (error) { console.error(error); return; }
+            c = mapCustomerFromDb(data);
+        }
 
         newCustomerForm.find("input[name='customerName']").val(c.name);
 
@@ -1104,10 +1330,16 @@ let updateRepairCustomer = async function (customerId) {
         if (document.getElementById("btnDeleteRepairCustomer")) document.getElementById("btnDeleteRepairCustomer").disabled = false;
         updateCustomerId = customerId;
 
-        const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
-        if (error) { console.error(error); return; }
-
-        let c = mapCustomerFromDb(data);
+        let c;
+        if (MOCK_MODE) {
+            // Mock 모드: allCustomers에서 이미 UI 형태로 매핑된 고객을 찾습니다.
+            c = allCustomers.find(cust => cust.id === customerId);
+            if (!c) { console.error("Mock customer not found:", customerId); return; }
+        } else {
+            const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
+            if (error) { console.error(error); return; }
+            c = mapCustomerFromDb(data);
+        }
 
         newRepairForm.find("input[name='customerName']").val(c.name);
         newRepairForm.find("input[name='phoneNumber']").val(c.phoneNumber);
@@ -1178,7 +1410,7 @@ let resetDialog = function () {
             if (inputTag.value == "Yes") inputTag.checked = (inputTag.name == "cardYN"); // Default cardYN to Yes, others to No
             if (inputTag.value == "No") inputTag.checked = (inputTag.name != "cardYN");
         } else if (inputTag.name == "hearingAidPurchaseDate" || inputTag.name == "batteryOrderDate" || inputTag.name == "registrationDate" || inputTag.name == "birthDate") {
-            inputTag.value = currentDate;
+            inputTag.value = currentDbDate;
         } else {
             inputTag.value = "";
         }
@@ -1196,6 +1428,13 @@ btnLogOut.addEventListener('click', async e => {
     const { error } = await _supabase.auth.signOut();
     if (error) console.log(error);
     location.replace("/html/Login.html");
+});
+
+// Bootstrap 3 hardening: hiding one modal while another is already open
+// (실적 → 고객 클릭) removes `modal-open` from <body> after the 300ms
+// fade-out, which kills modal scrolling. Restore it if a modal is still open.
+$(document).on('hidden.bs.modal', '.modal', function () {
+    if (document.querySelector('.modal.in')) document.body.classList.add('modal-open');
 });
 
 // Profile Picture Preview Listener
@@ -1449,12 +1688,12 @@ async function renderSalesStatsCustomers(year, month) {
 
                 const row = $(`
                     <tr style="cursor: pointer;">
-                        <td style="padding: 12px;">${customer.name}</td>
+                        <td style="padding: 12px;">${escapeHtml(customer.name)}</td>
                         <td style="padding: 12px; text-align: center;">
                             <span class="ha-badge ${badgeCls}" style="width: 25px; padding: 2px 4px; font-size: 0.7rem;">${sideKo}</span>
                         </td>
-                        <td style="padding: 12px; font-size: 0.9rem;">${item.model || '-'}</td>
-                        <td style="padding: 12px; font-size: 0.9rem;">${formatDate(item.date)}</td>
+                        <td style="padding: 12px; font-size: 0.9rem;">${item.model ? escapeHtml(item.model) : '-'}</td>
+                        <td style="padding: 12px; font-size: 0.9rem;">${escapeHtml(formatDate(item.date))}</td>
                     </tr>
                 `);
                 row.click(() => {
@@ -1565,4 +1804,199 @@ function renderMonthlySalesChart(year, labels, data) {
             }
         }]
     });
+}
+
+// ============================================================
+// Mock Data (?mock=1) — UI 형태(mapCustomerFromDb 결과)로 직접 생성
+// 날짜는 페이지 로드 시점(new Date())을 기준으로 계산되어 모든 버킷이 채워집니다.
+// ============================================================
+function getMockCustomers() {
+    // n일 전 날짜를 "YYYY/MM/DD"로 반환
+    function daysAgo(n) {
+        let d = new Date();
+        d.setDate(d.getDate() - n);
+        return convertDate(d, '/');
+    }
+    // n년 전 날짜를 "YYYY/MM/DD"로 반환 (같은 월 유지)
+    function yearsAgo(n) {
+        let d = new Date();
+        d.setFullYear(d.getFullYear() - n);
+        return convertDate(d, '/');
+    }
+    // 기본값 + override 로 목 고객 생성
+    function mock(overrides) {
+        return Object.assign({
+            key: "",
+            id: "",
+            name: "",
+            birthDate: "",
+            age: "",
+            sex: "Male",
+            batteryOrderDate: "",
+            cardAvailability: "No",
+            cochlearImplant: "No",
+            workersComp: "No",
+            address: "",
+            phoneNumber: "",
+            mobilePhoneNumber: "",
+            registrationDate: "",
+            fittingTest1: "",
+            fittingTest2: "",
+            fittingTest3: "",
+            fittingTest4: "",
+            fittingTest5: "",
+            note: "",
+            hearingAid: [],
+            repairReport: [],
+            updatedAt: ""
+        }, overrides);
+    }
+
+    return [
+        // 1주차 버킷 (구입일 5일 전) x2
+        mock({
+            key: "mock-0001", id: "mock-0001", name: "김민수", birthDate: "1955/03/12", sex: "Male",
+            cardAvailability: "Yes", address: "서울시 강남구 테헤란로 123",
+            phoneNumber: "02-345-6789", mobilePhoneNumber: "010-1234-5678",
+            registrationDate: yearsAgo(1), fittingTest1: daysAgo(30),
+            hearingAid: [{ side: "left", model: "Genesis AI 24", date: daysAgo(5) }]
+        }),
+        mock({
+            key: "mock-0002", id: "mock-0002", name: "이영희", birthDate: "1948/07/25", sex: "Female",
+            address: "부산시 해운대구 우동 456",
+            phoneNumber: "051-555-1212", mobilePhoneNumber: "010-2345-6789",
+            registrationDate: daysAgo(6), note: "양측 착용, 적응 잘함",
+            hearingAid: [
+                { side: "left", model: "Evolv AI 1200", date: daysAgo(5) },
+                { side: "right", model: "Evolv AI 1200", date: daysAgo(5) }
+            ]
+        }),
+
+        // 3주차 버킷 (구입일 19일 전)
+        mock({
+            key: "mock-0003", id: "mock-0003", name: "박철수", birthDate: "1962/11/03", sex: "Male",
+            address: "대구시 수성구 범어동 789",
+            phoneNumber: "053-777-8888", mobilePhoneNumber: "010-3456-7890",
+            registrationDate: daysAgo(20), fittingTest1: daysAgo(18),
+            hearingAid: [{ side: "right", model: "Livio Edge AI", date: daysAgo(19) }]
+        }),
+
+        // 7주차 버킷 (구입일 47일 전)
+        mock({
+            key: "mock-0004", id: "mock-0004", name: "정순자", birthDate: "1951/02/14", sex: "Female",
+            cardAvailability: "Yes", address: "인천시 남동구 구월동 12",
+            phoneNumber: "032-411-2233", mobilePhoneNumber: "010-4567-8901",
+            registrationDate: daysAgo(50), fittingTest1: daysAgo(46),
+            hearingAid: [{ side: "left", model: "Genesis AI 16", date: daysAgo(47) }]
+        }),
+
+        // 1년차 버킷 (구입일 1년 전, 같은 달)
+        mock({
+            key: "mock-0005", id: "mock-0005", name: "최동욱", birthDate: "1959/09/09", sex: "Male",
+            address: "광주시 서구 화정동 34",
+            phoneNumber: "062-222-3344", mobilePhoneNumber: "010-5678-9012",
+            registrationDate: yearsAgo(1), fittingTest1: daysAgo(60),
+            hearingAid: [
+                { side: "left", model: "Evolv AI 2400", date: yearsAgo(1) },
+                { side: "right", model: "Evolv AI 2400", date: yearsAgo(1) }
+            ]
+        }),
+
+        // 2년차 버킷 (구입일 2년 전, 같은 달)
+        mock({
+            key: "mock-0006", id: "mock-0006", name: "강미경", birthDate: "1966/05/18", sex: "Female",
+            cardAvailability: "Yes", address: "대전시 유성구 봉명동 56",
+            phoneNumber: "042-611-7788", mobilePhoneNumber: "010-6789-0123",
+            registrationDate: yearsAgo(2), fittingTest1: daysAgo(90),
+            hearingAid: [{ side: "left", model: "Muse iQ", date: yearsAgo(2) }]
+        }),
+
+        // 5년차 버킷 (구입일 5년 전, 같은 달)
+        mock({
+            key: "mock-0007", id: "mock-0007", name: "윤재호", birthDate: "1944/12/30", sex: "Male",
+            cochlearImplant: "Yes", address: "경기도 성남시 분당구 정자동 78",
+            phoneNumber: "031-711-9900", mobilePhoneNumber: "010-7890-1234",
+            registrationDate: yearsAgo(5), fittingTest1: daysAgo(120),
+            hearingAid: [{ side: "right", model: "Halo iQ", date: yearsAgo(5) }]
+        }),
+
+        // 적합검사 1년 도래 버킷 (최근 적합검사가 1년 초과) x2
+        mock({
+            key: "mock-0008", id: "mock-0008", name: "임선영", birthDate: "1953/08/08", sex: "Female",
+            address: "서울시 종로구 세종대로 90",
+            phoneNumber: "02-733-1010", mobilePhoneNumber: "010-8901-2345",
+            registrationDate: yearsAgo(3), fittingTest1: daysAgo(550),
+            hearingAid: [{ side: "left", model: "Genesis AI 24", date: yearsAgo(3) }]
+        }),
+        mock({
+            key: "mock-0009", id: "mock-0009", name: "한지훈", birthDate: "1970/01/21", sex: "Male",
+            address: "서울시 마포구 월드컵로 21",
+            phoneNumber: "02-333-4545", mobilePhoneNumber: "010-9012-3456",
+            registrationDate: yearsAgo(4), fittingTest1: daysAgo(500), fittingTest2: daysAgo(400),
+            hearingAid: [
+                { side: "left", model: "Livio AI", date: yearsAgo(4) },
+                { side: "right", model: "Livio AI", date: yearsAgo(4) }
+            ]
+        }),
+
+        // 1차 적합검사 5년 경과 버킷 x3 (다른 버킷과 겹칠 수 있음 - 현실적)
+        mock({
+            key: "mock-0010", id: "mock-0010", name: "오현주", birthDate: "1949/04/04", sex: "Female",
+            cardAvailability: "Yes", address: "경기도 수원시 팔달구 인계동 43",
+            phoneNumber: "031-255-6677", mobilePhoneNumber: "010-1010-2020",
+            registrationDate: yearsAgo(6), fittingTest1: daysAgo(2008),
+            hearingAid: [{ side: "left", model: "Genesis AI 24", date: yearsAgo(6) }]
+        }),
+        mock({
+            key: "mock-0011", id: "mock-0011", name: "서광호", birthDate: "1958/06/16", sex: "Male",
+            address: "서울시 송파구 올림픽로 65",
+            phoneNumber: "02-421-8080", mobilePhoneNumber: "010-3030-4040",
+            registrationDate: yearsAgo(6), fittingTest1: yearsAgo(6),
+            hearingAid: [{ side: "right", model: "Evolv AI 1200", date: yearsAgo(6) }]
+        }),
+        mock({
+            key: "mock-0012", id: "mock-0012", name: "남기석", birthDate: "1941/10/10", sex: "Male",
+            workersComp: "Yes", address: "부산시 부산진구 부전동 87",
+            phoneNumber: "051-808-9090", mobilePhoneNumber: "010-5050-6060",
+            registrationDate: yearsAgo(8), fittingTest1: yearsAgo(8),
+            hearingAid: [{ side: "left", model: "Muse iQ", date: yearsAgo(8) }]
+        }),
+
+        // 수리 전용 고객 x2 (보청기 없음)
+        // 집전화만 있고 핸드폰 없음
+        mock({
+            key: "mock-0013", id: "mock-0013", name: "배정미", birthDate: "1960/03/30", sex: "Female",
+            address: "서울시 노원구 상계동 9",
+            phoneNumber: "02-950-1234", mobilePhoneNumber: "",
+            registrationDate: yearsAgo(2),
+            repairReport: [{ date: daysAgo(10), content: "보청기 음질 저하 수리" }]
+        }),
+        // 핸드폰만 있고 집전화 없음
+        mock({
+            key: "mock-0014", id: "mock-0014", name: "문상철", birthDate: "1975/12/01", sex: "Male",
+            address: "경기도 고양시 일산동구 백석동 10",
+            phoneNumber: "", mobilePhoneNumber: "010-7070-8080",
+            registrationDate: yearsAgo(1),
+            repairReport: [{ date: daysAgo(40), content: "이어팁 교체 및 청소" }]
+        }),
+
+        // 일반 고객 (보청기 보유, 특정 버킷 없음)
+        mock({
+            key: "mock-0015", id: "mock-0015", name: "신혜란", birthDate: "1968/02/28", sex: "Female",
+            cardAvailability: "No", address: "대구시 중구 동성로 11",
+            phoneNumber: "053-431-2211", mobilePhoneNumber: "010-9090-1212",
+            registrationDate: yearsAgo(3), fittingTest1: daysAgo(200), note: "정기 점검 필요",
+            hearingAid: [
+                { side: "left", model: "Livio Edge AI", date: yearsAgo(3) },
+                { side: "right", model: "Livio Edge AI", date: yearsAgo(3) }
+            ]
+        }),
+        mock({
+            key: "mock-0016", id: "mock-0016", name: "조은비", birthDate: "1982/07/07", sex: "Female",
+            address: "서울시 영등포구 여의도동 12",
+            phoneNumber: "02-780-3434", mobilePhoneNumber: "010-1313-2424",
+            registrationDate: daysAgo(400), fittingTest1: daysAgo(150),
+            hearingAid: [{ side: "left", model: "Genesis AI 16", date: yearsAgo(3) }]
+        })
+    ];
 }

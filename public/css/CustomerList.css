@@ -20,7 +20,7 @@ body {
     /* High legibility */
     line-height: 1.6;
     margin: 0;
-    padding: 20px;
+    padding: 0;
 }
 
 .background {
@@ -28,7 +28,75 @@ body {
     margin: 0 auto;
     display: block;
     width: 100%;
+    padding: 20px;
     background: transparent;
+}
+
+/* Top App Bar */
+.app-bar {
+    position: sticky;
+    top: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 60px;
+    padding: 0 24px;
+    background: var(--white);
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.app-bar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.app-bar-logo {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    background-color: var(--primary-color);
+    -webkit-mask-image: url('../images/ear.svg');
+    mask-image: url('../images/ear.svg');
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+}
+
+.app-bar-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.btn-logout {
+    background: transparent;
+    border: 1px solid #d1d5db;
+    color: var(--text-light);
+    font-size: 0.95rem;
+    padding: 0.4rem 1rem;
+    box-shadow: none;
+}
+
+.btn-logout:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--danger);
+}
+
+.btn-logout:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.4);
+    outline-offset: 2px;
 }
 
 /* Header & Layout */
@@ -64,19 +132,33 @@ h3 {
 .search-container {
     display: flex;
     align-items: stretch;
-    /* Stretch items to match height */
     gap: 10px;
-    /* margin-left: auto; Removed auto margin to play nice with space-between */
+}
+
+.search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 320px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 14px;
+    color: var(--text-light);
+    font-size: 1.05rem;
+    pointer-events: none;
 }
 
 #filterInput {
-    padding: 0.75rem 1rem;
+    padding: 0.7rem 2.75rem 0.7rem 2.75rem;
     border: 2px solid #d1d5db;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     font-size: 1.3rem;
-    width: 300px;
+    width: 100%;
     outline: none;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 #filterInput:focus {
@@ -84,26 +166,38 @@ h3 {
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
+/* Clear (×) button — only visible when the input has text */
 #btnClearSearch {
-    font-size: 1.5rem;
-    padding: 0 1rem;
-    height: auto;
-    /* Let flex stretch it */
-    /* match input height roughly */
+    position: absolute;
+    right: 8px;
+    display: none;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    font-size: 1.4rem;
     line-height: 1;
-    border-radius: 0.375rem;
-    border: 1px solid #d1d5db;
-    background: white;
+    border-radius: 999px;
+    border: none;
+    background: #f3f4f6;
     color: #6b7280;
-    box-sizing: border-box;
-    display: flex;
+    cursor: pointer;
     align-items: center;
     justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.search-input-wrap.has-text #btnClearSearch {
+    display: flex;
 }
 
 #btnClearSearch:hover {
-    background: #f3f4f6;
+    background: #fee2e2;
     color: var(--danger);
+}
+
+#btnClearSearch:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.4);
+    outline-offset: 1px;
 }
 
 /* Header Actions */
@@ -202,6 +296,11 @@ table {
     /* Larger text */
 }
 
+/* Name column reads slightly stronger than the rest */
+.datagrid table tbody td:first-child {
+    font-weight: 600;
+}
+
 /* Customer List Icon */
 .ear-icon-container {
     margin-right: 8px;
@@ -282,6 +381,11 @@ table {
     border: 1px solid transparent;
     cursor: pointer;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.btn:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.4);
+    outline-offset: 2px;
 }
 
 .btn-primary {
@@ -381,8 +485,46 @@ select:focus {
 
 .modal-footer {
     background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
     border-bottom-left-radius: 0.5rem;
     border-bottom-right-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 12px 16px;
+}
+
+.modal-footer .btn+.btn {
+    margin-left: 0;
+    /* flex gap handles spacing (BS3 default adds 5px) */
+}
+
+/* 삭제 — outline style, visually separated on the left */
+.modal-footer .btn-danger {
+    order: -1;
+    margin-right: auto;
+    background: var(--white);
+    color: var(--danger);
+    border: 1px solid #fca5a5;
+    box-shadow: none;
+}
+
+.modal-footer .btn-danger:hover:not([disabled]) {
+    background: #fee2e2;
+}
+
+.modal-footer .btn-danger[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* An open modal always scrolls itself; never chain scroll to the body.
+   (BS3 relies on body.modal-open for .modal overflow — see JS hardening) */
+.modal.in {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .modal-header .close {
@@ -579,15 +721,214 @@ select:focus {
     }
 }
 
+/* Below 900px: one column at a time, switched via the bottom tab bar.
+   The body class has NO effect at >=900px (rules are scoped in here). */
+@media (max-width: 899px) {
+    /* `body` prefix raises specificity so this beats the base
+       `#mobileTabBar { display: none }` rule that appears later in the file. */
+    body #mobileTabBar {
+        display: flex;
+    }
+
+    body {
+        padding-bottom: calc(62px + env(safe-area-inset-bottom));
+    }
+
+    #customerListContent {
+        display: block;
+    }
+
+    #noticeContent {
+        display: none;
+        margin-top: 0;
+    }
+
+    body.mobile-show-notice #customerListContent {
+        display: none;
+    }
+
+    body.mobile-show-notice #noticeContent {
+        display: block;
+    }
+
+    /* ── 정기 관리 chip navigation ── */
+    /* `#noticeContent` prefix beats the base `.notice-chip-bar { display:none }`
+       that appears later in the file (same trick as the tab bar). */
+    #noticeContent .notice-chip-bar {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 2px 2px 10px;
+        margin-bottom: 4px;
+        scrollbar-width: none;
+    }
+
+    .notice-chip-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .notice-chip {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid #d1d5db;
+        background: var(--white);
+        font-family: inherit;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        cursor: pointer;
+        transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .notice-chip:active {
+        background: #eff6ff;
+        border-color: var(--primary-color);
+    }
+
+    .notice-chip .chip-count {
+        min-width: 1.4em;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: var(--primary-color);
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .notice-chip.is-urgent .chip-count {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .notice-chip.is-zero {
+        color: var(--text-light);
+        opacity: 0.55;
+    }
+
+    /* Sticky section headers just below the app bar while their section scrolls.
+       Requires overflow visible on the section container. */
+    #noticeContent .datagrid {
+        overflow: visible;
+    }
+
+    #noticeContent .notice-header {
+        position: sticky;
+        top: 60px;
+        z-index: 10;
+        background: var(--white);
+    }
+
+    .notice-section {
+        scroll-margin-top: 68px;
+    }
+}
+
 /* Side Grids */
 #noticeContent .datagrid {
     padding: 0;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
-#noticeContent h3 {
-    padding: 1rem 1.5rem;
+/* Notice Section Header (clickable / collapsible) */
+.notice-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.85rem 1.25rem;
     border-bottom: 1px solid #e5e7eb;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+}
+
+.notice-header:hover {
+    background: #f9fafb;
+}
+
+.notice-header:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.35);
+    outline-offset: -3px;
+}
+
+.notice-header h3 {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    font-size: 1.15rem;
+    line-height: 1.3;
+}
+
+.notice-count-badge {
+    flex-shrink: 0;
+    min-width: 1.9rem;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: var(--primary-color);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.notice-chevron {
+    flex-shrink: 0;
+    color: var(--text-light);
+    font-size: 0.95rem;
+    transition: transform 0.2s ease;
+}
+
+/* Collapsed state */
+.notice-section.collapsed .notice-body {
+    display: none;
+}
+
+.notice-section.collapsed .notice-chevron {
+    transform: rotate(-90deg);
+}
+
+/* Empty state */
+.notice-empty {
+    display: none;
+    padding: 1.1rem 1.25rem;
+    color: var(--text-light);
+    font-size: 1rem;
+    text-align: center;
+}
+
+.notice-section.is-empty .notice-body table {
+    display: none;
+}
+
+.notice-section.is-empty .notice-empty {
+    display: block;
+}
+
+/* Urgency accent — attention/overdue lists (amber, not alarming red) */
+.notice-section.urgent {
+    border-left: 4px solid #f59e0b;
+}
+
+.notice-section.urgent .notice-count-badge {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Denser notice tables (they are compact lists) */
+#noticeContent .datagrid table thead th {
+    padding: 0.7rem 1.25rem;
+}
+
+#noticeContent .datagrid table tbody td {
+    padding: 0.8rem 1.25rem;
+    font-size: 1.05rem;
 }
 
 /* Loader */
@@ -624,10 +965,75 @@ select:focus {
     }
 }
 
-.logout-container {
+/* 정기 관리 chip navigation — mobile only (shown in the <900px media query) */
+.notice-chip-bar {
+    display: none;
+}
+
+/* Mobile Bottom Tab Bar — exists only below 900px (see media query) */
+#mobileTabBar {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 950;
+    background: var(--white);
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.06);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mobile-tab {
+    flex: 1;
     display: flex;
-    justify-content: flex-end;
-    margin-bottom: 20px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 4px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-light);
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: color 0.15s ease;
+}
+
+.mobile-tab i {
+    font-size: 1.35rem;
+}
+
+.mobile-tab.active {
+    color: var(--primary-color);
+}
+
+.mobile-tab:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.35);
+    outline-offset: -3px;
+}
+
+.mobile-tab-icon-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.mobile-tab-badge {
+    position: absolute;
+    top: -6px;
+    left: 100%;
+    transform: translateX(-40%);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
 }
 
 /* Mobile Responsive Adjustments */
@@ -640,9 +1046,16 @@ select:focus {
 
 @media (max-width: 768px) {
     body {
-        padding: 10px;
         font-size: 16px;
-        /* Reset base font size for mobile */
+        /* Reset base font size for mobile (keep bottom padding for tab bar) */
+    }
+
+    .background {
+        padding: 10px;
+    }
+
+    .app-bar {
+        padding: 0 16px;
     }
 
     .header-controls {
@@ -651,6 +1064,10 @@ select:focus {
     }
 
     .search-container {
+        width: 100%;
+    }
+
+    .search-input-wrap {
         width: 100%;
     }
 
@@ -674,53 +1091,296 @@ select:focus {
         font-size: 0.9rem;
     }
 
-    /* Card View for Tables */
-    .datagrid table thead {
-        display: none;
-        /* Hide headers */
+    /* ══ Mobile list redesign ═══════════════════════════════════════
+       Scoped to the page tables (#customerListContent / #noticeContent);
+       modal-internal tables (실적 통계 등) stay regular tables. */
+
+    /* A. Containers go chrome-less: cards float directly on the gray page */
+    #customerListContent .datagrid,
+    #noticeContent .datagrid {
+        background: transparent;
+        border-radius: 0;
+        box-shadow: none;
+        overflow: visible;
+        margin-bottom: 1.25rem;
     }
 
-    .datagrid table tbody tr {
-        display: block;
-        margin-bottom: 1rem;
-        background: #fff;
+    #noticeContent .notice-section.urgent {
+        border-left: none;
+    }
+
+    /* Section header becomes its own compact card row */
+    #noticeContent .notice-header {
         border: 1px solid #e5e7eb;
         border-radius: 0.5rem;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        margin-bottom: 0.75rem;
+        padding: 0.7rem 1rem;
     }
 
-    .datagrid table tbody td {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #f3f4f6;
-        padding: 0.75rem 1rem;
-        font-size: 1rem;
-        text-align: right;
+    #noticeContent .notice-section.urgent .notice-header {
+        border-left: 4px solid #f59e0b;
     }
 
-    .datagrid table tbody td:last-child {
-        border-bottom: none;
+    #noticeContent .notice-header h3 {
+        font-size: 1.05rem;
     }
 
-    /* Hide empty rows (cells) */
-    .datagrid table tbody td:empty {
+    /* Empty state reads as an intentional card on gray */
+    .notice-empty {
+        background: var(--white);
+        border: 1px dashed #d1d5db;
+        border-radius: 0.5rem;
+    }
+
+    /* B. Row = one compact contact-list card:
+       [아바타] [이름 + 귀아이콘 ............ 날짜]
+                [모델명 / 주소 / 수리내역]
+                [☎ 집전화   📱 핸드폰]           */
+    #customerListContent .datagrid table thead,
+    #noticeContent .datagrid table thead {
         display: none;
     }
 
-    .datagrid table tbody td::before {
-        content: attr(data-label);
-        font-weight: 600;
-        color: var(--text-light);
-        margin-right: 1rem;
-        text-align: left;
-        /* flex: 1; */
+    #customerListContent .datagrid table,
+    #noticeContent .datagrid table,
+    #customerListContent .datagrid table tbody,
+    #noticeContent .datagrid table tbody {
+        display: block;
     }
 
-    /* Modal Responsive */
+    #customerListContent .datagrid table tbody tr,
+    #noticeContent .datagrid table tbody tr {
+        display: grid;
+        grid-template-columns: 44px minmax(0, max-content) minmax(0, 1fr) auto;
+        grid-template-rows: auto auto auto;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 2px;
+        padding: 10px 14px;
+        margin-bottom: 10px;
+        background: var(--white);
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Reset cells; kill the old label:value treatment */
+    #customerListContent .datagrid table tbody td,
+    #noticeContent .datagrid table tbody td {
+        display: block;
+        padding: 0;
+        border: none;
+        text-align: left;
+        font-size: 1rem;
+        min-width: 0;
+    }
+
+    #customerListContent .datagrid table tbody td::before,
+    #noticeContent .datagrid table tbody td::before {
+        content: none;
+    }
+
+    /* td2 사진 — avatar spans the whole card height */
+    #customerListContent .datagrid table tbody td:nth-child(2),
+    #noticeContent .datagrid table tbody td:nth-child(2) {
+        grid-column: 1;
+        grid-row: 1 / span 3;
+        align-self: start;
+    }
+
+    /* td1 이름 — bold, ellipsized when long */
+    #customerListContent .datagrid table tbody td:nth-child(1),
+    #noticeContent .datagrid table tbody td:nth-child(1) {
+        grid-column: 2;
+        grid-row: 1;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* td3 귀 아이콘 — inline right after the name */
+    #customerListContent .datagrid table tbody td:nth-child(3),
+    #noticeContent .datagrid table tbody td:nth-child(3) {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: start;
+    }
+
+    /* td4 연락처 — bottom row, tel links side-by-side, comfortably tappable */
+    #customerListContent .datagrid table tbody td:nth-child(4),
+    #noticeContent .datagrid table tbody td:nth-child(4) {
+        grid-column: 2 / -1;
+        grid-row: 3;
+        display: flex;
+        flex-wrap: wrap;
+        column-gap: 16px;
+        align-items: center;
+    }
+
+    #customerListContent .datagrid table tbody td:nth-child(4) a,
+    #noticeContent .datagrid table tbody td:nth-child(4) a {
+        display: inline-block;
+        padding: 12px 0;
+        /* ≈40px effective touch height */
+    }
+
+    /* Main list: td5 = 주소 / 최근 수리내역 (middle row, one line, ellipsis) */
+    #customerListContent .datagrid table tbody td:nth-child(5) {
+        grid-column: 2 / -1;
+        grid-row: 2;
+        color: var(--text-light);
+        font-size: 0.95rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Notice: td5 = 날짜 (top-right, muted; amber in urgent sections) */
+    #noticeContent .datagrid table tbody td:nth-child(5) {
+        grid-column: 4;
+        grid-row: 1;
+        justify-self: end;
+        color: var(--text-light);
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
+
+    #noticeContent .notice-section.urgent table tbody td:nth-child(5) {
+        color: #b45309;
+        font-weight: 600;
+    }
+
+    /* Notice: td6 = 모델명 (middle row, muted) */
+    #noticeContent .datagrid table tbody td:nth-child(6) {
+        grid-column: 2 / -1;
+        grid-row: 2;
+        color: var(--text-light);
+        font-size: 0.95rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Empty cells vanish; the grid skips them.
+       (Kept LAST: it ties the nth-child rules on specificity, so source
+        order makes display:none win for empty cells.) */
+    #customerListContent .datagrid table tbody td:empty,
+    #noticeContent .datagrid table tbody td:empty {
+        display: none;
+    }
+
+    /* Every-10th-row marker, adapted to the card style */
+    #customerListContent .datagrid table tbody tr.highlight,
+    #noticeContent .datagrid table tbody tr.highlight {
+        background: var(--white) !important;
+        border-bottom: 3px double #6b7280 !important;
+    }
+
+    /* ── Full-screen modal sheets ── */
     .modal-dialog {
-        margin: 10px auto;
-        width: 95%;
+        margin: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .modal-content {
+        min-height: 100vh;
+        min-height: 100dvh;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .modal-header {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        background: var(--white);
+        padding: 0.85rem 1rem;
+    }
+
+    .modal-body {
+        flex: 1 1 auto;
+    }
+
+    .modal-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 30;
+        border-radius: 0;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    }
+
+    /* 저장 fills the row; 삭제 stays compact on the left */
+    .modal-footer .btn-primary {
+        flex: 1;
+        padding: 0.85rem 1rem;
+        font-size: 1.1rem;
+    }
+
+    .modal-footer .btn-danger {
+        margin-right: 0;
+        /* flex gap is enough on narrow screens */
+    }
+
+    /* 실적: keep the chart short enough that the list below stays reachable */
+    #salesChartContainer {
+        height: 40vh !important;
+    }
+
+    /* 고객 정보: compact horizontal profile row instead of the big
+       centered avatar block. (`.modal-body` prefix beats the base rules
+       that appear later in the file.) */
+    .modal-body .compact-layout {
+        flex-direction: column;
+    }
+
+    .modal-body .compact-sidebar {
+        display: grid;
+        grid-template-columns: 88px minmax(0, 1fr);
+        column-gap: 12px;
+        align-items: center;
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 0 0 12px 0;
+    }
+
+    .modal-body .profile-upload-container,
+    .modal-body .profile-large-preview {
+        width: 72px;
+        height: 72px;
+    }
+
+    .modal-body .profile-upload-container {
+        margin-bottom: 0;
+    }
+
+    .modal-body .profile-upload-overlay {
+        width: 28px;
+        height: 28px;
+    }
+
+    .modal-body .profile-upload-icon {
+        font-size: 0.9rem;
+    }
+
+    .modal-body .sidebar-name-input {
+        margin-bottom: 0;
+        text-align: left;
+    }
+
+    .modal-body .sidebar-name-input input {
+        text-align: left;
+    }
+
+    .modal-body .sidebar-toggles-grid {
+        grid-column: 1 / -1;
+        margin-top: 10px;
     }
 
     .modal-form-grid {
@@ -770,13 +1430,15 @@ select:focus {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: #ddd;
-    color: #555;
+    /* Default fallback — overridden per-name via inline style (see avatarColorFor) */
+    background-color: #e5e7eb;
+    color: #4b5563;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-weight: bold;
+    font-weight: 700;
     font-size: 16px;
+    letter-spacing: -0.01em;
 }
 
 /* Modal Image Preview */
@@ -1013,13 +1675,22 @@ select:focus {
     color: var(--danger);
 }
 
-/* Fitting Test styles */
-.fitting-test-section {
-    background: #f0fdf4;
-    /* Subtle green */
+/* Form section cards share one visual language
+   (기본 정보 / 보청기·배터리 / 적합 검사 / 메모) */
+.basic-info-section,
+.compact-memo {
+    background: #f9fafb;
     border-radius: 6px;
     padding: 10px;
-    border: 1px solid #dcfce7;
+    border: 1px solid #e5e7eb;
+}
+
+/* Fitting Test styles */
+.fitting-test-section {
+    background: #f9fafb;
+    border-radius: 6px;
+    padding: 10px;
+    border: 1px solid #e5e7eb;
     margin-top: 10px;
 }
 

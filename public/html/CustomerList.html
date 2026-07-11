@@ -2,7 +2,8 @@
 <html>
 
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>스타키 고객 관리</title>
     <link rel="icon" type="image/png" href="../favicon.png">
     <link rel="apple-touch-icon" href="../apple-touch-icon.png">
@@ -21,10 +22,19 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" type="text/css" href="../css/CustomerList.css?v=20260102_1">
+    <link rel="stylesheet" type="text/css" href="../css/CustomerList.css?v=20260712_1">
 </head>
 
 <body>
+    <header class="app-bar">
+        <div class="app-bar-brand">
+            <span class="app-bar-logo" aria-hidden="true"></span>
+            <span class="app-bar-title">스타키 고객 관리</span>
+        </div>
+        <div class="app-bar-actions">
+            <button id="btnLogOut" class="btn btn-logout">로그아웃</button>
+        </div>
+    </header>
     <div class="background">
         <div id="customerListContent" class="col-xs-12 col-md-7">
             <div class="main-header">
@@ -47,8 +57,13 @@
                         <button id="btnSalesStats" type="button" class="btn btn-success">실적</button>
                     </div>
                     <div class="search-container">
-                        <input type="text" id="filterInput" onkeyup="filterTable()" placeholder="검색어 입력">
-                        <button id="btnClearSearch" class="btn btn-default" onclick="clearFilter()">&times;</button>
+                        <div class="search-input-wrap">
+                            <i class="fa fa-search search-icon" aria-hidden="true"></i>
+                            <input type="text" id="filterInput" onkeyup="filterTable()" autocomplete="off"
+                                placeholder="이름, 연락처, 주소, 모델명 검색">
+                            <button id="btnClearSearch" onclick="clearFilter()" aria-label="검색어 지우기"
+                                title="지우기">&times;</button>
+                        </div>
                     </div>
                 </div>
 
@@ -69,57 +84,126 @@
             </div>
         </div>
         <div id="noticeContent" class="col-xs-12 col-md-5">
-            <div class="logout-container">
-                <button id="btnLogOut" class="btn btn-danger">로그아웃</button>
+            <div id="noticeChipBar" class="notice-chip-bar" aria-label="정기 관리 섹션 바로가기"></div>
+            <div class="datagrid notice-section urgent" id="fittingOver5Year">
+                <div class="notice-header" role="button" tabindex="0" aria-expanded="true"
+                    onclick="toggleNoticeSection(this)">
+                    <h3>1차 적합검사 5년 경과 고객</h3>
+                    <span class="notice-count-badge">0</span>
+                    <i class="fa fa-chevron-down notice-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="notice-body">
+                    <div class="notice-empty">해당 고객이 없습니다</div>
+                    <table class="customersTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="datagrid" id="oneWeek">
-                <h3>1주차 고객</h3>
-                <table class="customersTable">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
+            <div class="datagrid notice-section" id="oneWeek">
+                <div class="notice-header" role="button" tabindex="0" aria-expanded="true"
+                    onclick="toggleNoticeSection(this)">
+                    <h3>1주차 고객</h3>
+                    <span class="notice-count-badge">0</span>
+                    <i class="fa fa-chevron-down notice-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="notice-body">
+                    <div class="notice-empty">해당 고객이 없습니다</div>
+                    <table class="customersTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="datagrid" id="threeWeek">
-                <h3>3주차 고객</h3>
-                <table class="customersTable">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
+            <div class="datagrid notice-section" id="threeWeek">
+                <div class="notice-header" role="button" tabindex="0" aria-expanded="true"
+                    onclick="toggleNoticeSection(this)">
+                    <h3>3주차 고객</h3>
+                    <span class="notice-count-badge">0</span>
+                    <i class="fa fa-chevron-down notice-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="notice-body">
+                    <div class="notice-empty">해당 고객이 없습니다</div>
+                    <table class="customersTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="datagrid" id="sevenWeek">
-                <h3>7주차 고객</h3>
-                <table class="customersTable">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
+            <div class="datagrid notice-section" id="sevenWeek">
+                <div class="notice-header" role="button" tabindex="0" aria-expanded="true"
+                    onclick="toggleNoticeSection(this)">
+                    <h3>7주차 고객</h3>
+                    <span class="notice-count-badge">0</span>
+                    <i class="fa fa-chevron-down notice-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="notice-body">
+                    <div class="notice-empty">해당 고객이 없습니다</div>
+                    <table class="customersTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="datagrid" id="oneYear">
-                <h3>1년차 고객</h3>
-                <table class="customersTable">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
+            <div class="datagrid notice-section" id="oneYear">
+                <div class="notice-header" role="button" tabindex="0" aria-expanded="true"
+                    onclick="toggleNoticeSection(this)">
+                    <h3>1년차 고객</h3>
+                    <span class="notice-count-badge">0</span>
+                    <i class="fa fa-chevron-down notice-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="notice-body">
+                    <div class="notice-empty">해당 고객이 없습니다</div>
+                    <table class="customersTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="datagrid" id="twoYear">
-                <h3>2년차 고객</h3>
-                <table class="customersTable">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
+            <div class="datagrid notice-section" id="twoYear">
+                <div class="notice-header" role="button" tabindex="0" aria-expanded="true"
+                    onclick="toggleNoticeSection(this)">
+                    <h3>2년차 고객</h3>
+                    <span class="notice-count-badge">0</span>
+                    <i class="fa fa-chevron-down notice-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="notice-body">
+                    <div class="notice-empty">해당 고객이 없습니다</div>
+                    <table class="customersTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="datagrid" id="fiveYear">
-                <h3>5년차 고객</h3>
-                <table class="customersTable">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
+            <div class="datagrid notice-section" id="fiveYear">
+                <div class="notice-header" role="button" tabindex="0" aria-expanded="true"
+                    onclick="toggleNoticeSection(this)">
+                    <h3>5년차 고객</h3>
+                    <span class="notice-count-badge">0</span>
+                    <i class="fa fa-chevron-down notice-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="notice-body">
+                    <div class="notice-empty">해당 고객이 없습니다</div>
+                    <table class="customersTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="datagrid" id="fittingDue">
-                <h3>적합검사 1년 도래 고객</h3>
-                <table class="customersTable">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
+            <div class="datagrid notice-section urgent" id="fittingDue">
+                <div class="notice-header" role="button" tabindex="0" aria-expanded="true"
+                    onclick="toggleNoticeSection(this)">
+                    <h3>적합검사 1년 도래 고객</h3>
+                    <span class="notice-count-badge">0</span>
+                    <i class="fa fa-chevron-down notice-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="notice-body">
+                    <div class="notice-empty">해당 고객이 없습니다</div>
+                    <table class="customersTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -204,8 +288,12 @@
 
                             <!-- Main Content -->
                             <div class="compact-main">
-                                <!-- Info Grid -->
-                                <div class="info-grid">
+                                <!-- Basic Info Section -->
+                                <div class="basic-info-section">
+                                    <div class="section-header">
+                                        <span class="section-title">기본 정보</span>
+                                    </div>
+                                    <div class="info-grid">
                                     <div class="compact-form-group">
                                         <label>핸드폰</label>
                                         <input type="text" name="mobilePhoneNumber" class="form-control" />
@@ -227,6 +315,7 @@
                                     <div class="compact-form-group full-row">
                                         <label>주소</label>
                                         <input type="text" name="address" class="form-control" />
+                                    </div>
                                     </div>
                                 </div>
 
@@ -284,8 +373,9 @@
 
                                 <!-- Memo -->
                                 <div class="compact-memo">
-                                    <label
-                                        style="font-size:0.8rem; color:var(--text-light); margin-bottom:2px; display:block;">메모</label>
+                                    <div class="section-header">
+                                        <span class="section-title">메모</span>
+                                    </div>
                                     <textarea name="note" class="form-control" placeholder="메모사항..."></textarea>
                                 </div>
                             </div>
@@ -379,11 +469,24 @@
             </div>
         </div>
     </div>
+    <nav id="mobileTabBar" aria-label="화면 전환">
+        <button type="button" class="mobile-tab active" data-tab="list" onclick="switchMobileTab('list')">
+            <i class="fa fa-users" aria-hidden="true"></i>
+            <span>고객 리스트</span>
+        </button>
+        <button type="button" class="mobile-tab" data-tab="notice" onclick="switchMobileTab('notice')">
+            <span class="mobile-tab-icon-wrap">
+                <i class="fa fa-bell" aria-hidden="true"></i>
+                <span id="mobileNoticeBadge" class="mobile-tab-badge">0</span>
+            </span>
+            <span>정기 관리</span>
+        </button>
+    </nav>
     <div id="loader">
         <div id="spinner"></div>
         <h4>처리 중...</h4>
     </div>
 </body>
-<script src="../js/CustomerList.js?v=20260102_1"></script>
+<script src="../js/CustomerList.js?v=20260712_1" charset="utf-8"></script>
 
 </html>

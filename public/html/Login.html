@@ -3,23 +3,25 @@
 
 <head>
 	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>스타키 고객 관리 - 로그인</title>
 	<link rel="icon" type="image/png" href="../favicon.png">
 	<link rel="apple-touch-icon" href="../apple-touch-icon.png">
 	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
-	<link rel="stylesheet" type="text/css" href="../css/Login.css?v=20260102_1">
+	<link rel="stylesheet" type="text/css" href="../css/Login.css?v=20260711_1">
 </head>
 
 <body>
 	<div class="login">
-		<h1>Login</h1>
-		<input id="txtEmail" type="email" name="u" placeholder="Email" required="required" />
-		<input id="txtPassword" type="password" name="p" placeholder="Password" required="required" />
-		<button id="btnLogin" class="btn btn-primary btn-block btn-large">Login</button>
+		<div class="login-logo" aria-hidden="true"></div>
+		<h1>스타키 고객 관리</h1>
+		<p class="login-subtitle">고객 관리 시스템</p>
+		<input id="txtEmail" type="email" name="u" placeholder="이메일" required="required" />
+		<input id="txtPassword" type="password" name="p" placeholder="비밀번호" required="required" />
+		<button id="btnLogin" class="btn btn-primary btn-block btn-large">로그인</button>
 	</div>
 </body>
-<script src="../js/Login.js?v=20260102_1"></script>
+<script src="../js/Login.js?v=20260711_1" charset="utf-8"></script>
 
 </html>
