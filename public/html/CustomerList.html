@@ -22,7 +22,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" type="text/css" href="../css/CustomerList.css?v=20260712_1">
+    <link rel="stylesheet" type="text/css" href="../css/CustomerList.css?v=20260712_2">
 </head>
 
 <body>
@@ -207,12 +207,33 @@
             </div>
         </div>
 
+        <!-- Customer Detail Dialog (read-only profile) -->
+        <div id="customerDetailDialog" class="modal fade" role="dialog">
+            <div class="modal-dialog modal-detail">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">고객 정보</h3>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">닫기</button>
+                    </div>
+                    <div class="modal-body" id="customerDetailBody">
+                        <!-- populated by showCustomerDetail() -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="btnCloseDetail" class="btn btn-default"
+                            data-dismiss="modal">닫기</button>
+                        <button type="button" id="btnEditCustomer" class="btn btn-primary"
+                            onclick="editFromDetail()">정보 수정</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- New Customer Dialog -->
         <div id="newCustomerDialog" class="modal fade" role="dialog">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h3 class="modal-title">고객 정보</h3>
+                        <h3 class="modal-title">고객 정보 수정</h3>
                         <button id="btnCancelNewCustomer" class="btn btn-default" data-dismiss="modal">닫기</button>
                     </div>
                     <div class="modal-body newCustomerForm">
@@ -346,6 +367,9 @@
                                 <div class="fitting-test-section">
                                     <div class="section-header">
                                         <span class="section-title">적합 검사</span>
+                                        <button type="button" id="btnAddFittingSlot" onclick="addFittingSlot()"
+                                            class="btn btn-primary btn-sm"
+                                            style="padding:2px 8px; font-size:0.8rem;">+ 추가</button>
                                     </div>
                                     <div class="fitting-grid">
                                         <div class="fitting-item">
@@ -487,6 +511,6 @@
         <h4>처리 중...</h4>
     </div>
 </body>
-<script src="../js/CustomerList.js?v=20260712_1" charset="utf-8"></script>
+<script src="../js/CustomerList.js?v=20260712_2" charset="utf-8"></script>
 
 </html>

@@ -206,6 +206,39 @@ function avatarColorFor(name) {
     return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
 }
 
+// 만 나이 ("YYYY/MM/DD" → 정수, 계산 불가 시 null)
+function koreanAge(birthDate) {
+    if (isNull(birthDate)) return null;
+    let d = new Date(birthDate);
+    if (isNaN(d.getTime())) return null;
+    let today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    let m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+    return (age >= 0 && age < 150) ? age : null;
+}
+
+// 오늘까지의 경과 기간 → "N년 M개월" / "N년" / "N개월" / "N일" (0 단위 생략).
+// Date 또는 날짜 문자열 허용; 무효/미래 날짜는 "" 반환.
+function elapsedText(dateInput) {
+    if (dateInput == null || dateInput === "") return "";
+    let d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (isNaN(d.getTime())) return "";
+    let now = new Date();
+    if (d > now) return "";
+    let months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+    if (now.getDate() < d.getDate()) months--;
+    if (months <= 0) {
+        let days = Math.floor((now - d) / 86400000);
+        return days + "일";
+    }
+    let y = Math.floor(months / 12);
+    let m = months % 12;
+    if (y > 0 && m > 0) return y + "년 " + m + "개월";
+    if (y > 0) return y + "년";
+    return m + "개월";
+}
+
 // Build a lowercase search index string for a customer row (name, phones raw + digits-only, address, models, last repair)
 function buildSearchIndex(customerData) {
     let parts = [];
@@ -484,7 +517,7 @@ async function loadCustomers() {
             let hasRight = aids.some(ha => ha.side === 'right');
 
             let row = tableBody.insertRow();
-            row.setAttribute('onclick', 'updateCustomer(\'' + customerData.id + '\')');
+            row.setAttribute('onclick', 'showCustomerDetail(\'' + customerData.id + '\')');
 
             // Name
             row.insertCell(0).innerHTML = escapeHtml(customerData.name);
@@ -580,7 +613,7 @@ function renderCustomerList() {
 
         filteredCustomers.forEach(function (customerData) {
             var bodyRow = repairCustomerListTableBody.insertRow(repairCustomerListTableBody.rows.length);
-            bodyRow.setAttribute('onclick', 'updateRepairCustomer(\'' + customerData.id + '\')');
+            bodyRow.setAttribute('onclick', 'showCustomerDetail(\'' + customerData.id + '\')');
             bodyRow.dataset.search = buildSearchIndex(customerData);
             var hasLeft = false;
             var hasRight = false;
@@ -644,7 +677,7 @@ function renderCustomerList() {
 
         filteredCustomers.forEach(function (customerData) {
             var bodyRow = customerListTableBody.insertRow(customerListTableBody.rows.length);
-            bodyRow.setAttribute('onclick', 'updateCustomer(\'' + customerData.id + '\')');
+            bodyRow.setAttribute('onclick', 'showCustomerDetail(\'' + customerData.id + '\')');
             bodyRow.dataset.search = buildSearchIndex(customerData);
             var hasLeft = false;
             var hasRight = false;
@@ -919,6 +952,7 @@ btnBuyRepair.change(function () {
 
 btnNewCustomer.addEventListener('click', e => {
     resetDialog();
+    refreshFittingSlots();
     updateCustomerId = "";
     // Reset Profile Picture UI
     let preview = document.getElementById('profilePreview');
@@ -1311,6 +1345,7 @@ let updateCustomer = async function (customerId) {
         newCustomerForm.find("input[name='fittingTest4']").val(toDbDate(c.fittingTest4));
         newCustomerForm.find("input[name='fittingTest5']").val(toDbDate(c.fittingTest5));
         newCustomerForm.find("textarea[name='note']").val(c.note);
+        refreshFittingSlots();
     } finally {
         $("#loader").hide();
     }
@@ -1356,6 +1391,247 @@ let updateRepairCustomer = async function (customerId) {
     } finally {
         $("#loader").hide();
     }
+}
+
+// ══ 고객 상세 보기 (read-only) ═══════════════════════════════════════
+// 고객 클릭 시 수정 폼 대신 파생 정보가 정리된 상세 화면을 먼저 보여줍니다.
+// "정보 수정" / "관리" 버튼으로 기존 수정 폼(updateCustomer 등)에 진입합니다.
+let detailCustomerId = "";
+
+let showCustomerDetail = async function (customerId) {
+    $("#loader h4").text("정보 불러오는 중...");
+    $("#loader").css("display", "flex");
+    try {
+        let c;
+        if (MOCK_MODE) {
+            c = allCustomers.find(cust => cust.id === customerId);
+            if (!c) { console.error("Mock customer not found:", customerId); return; }
+        } else {
+            const { data, error } = await _supabase.from('customers').select('*, hearing_aids(*), repairs(*)').eq('id', customerId).single();
+            if (error) { console.error(error); return; }
+            c = mapCustomerFromDb(data);
+        }
+        renderCustomerDetail(c);
+        $('#customerDetailDialog').modal('show');
+    } finally {
+        $("#loader").hide();
+    }
+}
+
+// 상세 → 수정 폼 (상세 모달이 완전히 닫힌 뒤 열어 backdrop 중첩 방지)
+function editFromDetail() {
+    let id = detailCustomerId;
+    $('#customerDetailDialog').one('hidden.bs.modal', function () {
+        updateCustomer(id);
+    });
+    $('#customerDetailDialog').modal('hide');
+}
+
+// 상세 → 수리 이력 관리 폼
+function repairFromDetail() {
+    let id = detailCustomerId;
+    $('#customerDetailDialog').one('hidden.bs.modal', function () {
+        updateRepairCustomer(id);
+    });
+    $('#customerDetailDialog').modal('hide');
+}
+
+// 데이터가 있는 섹션만 렌더링합니다 (빈 섹션은 표시하지 않음).
+function renderCustomerDetail(c) {
+    detailCustomerId = c.id;
+    let html = '';
+
+    let card = function (title, inner, headerExtra) {
+        return '<div class="detail-card"><div class="detail-card-header">'
+            + '<span class="detail-card-title">' + title + '</span>'
+            + (headerExtra || '')
+            + '</div>' + inner + '</div>';
+    };
+
+    // 1. Identity header
+    let profileUrl = `https://firebasestorage.googleapis.com/v0/b/${_storageBucketName}/o/customer_profiles%2F${c.id}?alt=media&t=${c.updatedAt ? new Date(c.updatedAt).getTime() : ''}`;
+    let av = avatarColorFor(c.name);
+    let initial = escapeHtml([...(c.name || '')][0] || '?');
+
+    let sub = [];
+    let age = koreanAge(c.birthDate);
+    if (age != null) sub.push('만 ' + age + '세');
+    if (c.sex === 'Male') sub.push('남');
+    else if (c.sex === 'Female') sub.push('여');
+    if (!isNull(c.registrationDate)) {
+        let regYear = String(c.registrationDate).split('/')[0];
+        if (regYear && regYear.length === 4) sub.push('가입 ' + regYear + '년');
+    }
+
+    let chips = '';
+    if (c.cardAvailability === 'Yes') chips += '<span class="detail-chip chip-blue">복지카드</span>';
+    if (c.cochlearImplant === 'Yes') chips += '<span class="detail-chip chip-violet">인공와우</span>';
+    if (c.workersComp === 'Yes') chips += '<span class="detail-chip chip-orange">산재보험</span>';
+
+    html += '<div class="detail-identity">'
+        + '<div class="detail-avatar">'
+        + '<img src="' + profileUrl + '" loading="lazy" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';" />'
+        + '<div class="detail-avatar-fallback" style="display:none; background-color:' + av.bg + '; color:' + av.fg + ';">' + initial + '</div>'
+        + '</div>'
+        + '<div class="detail-identity-text">'
+        + '<div class="detail-name">' + escapeHtml(c.name) + '</div>'
+        + (sub.length ? '<div class="detail-subline">' + sub.join(' · ') + '</div>' : '')
+        + (chips ? '<div class="detail-chips">' + chips + '</div>' : '')
+        + '</div></div>';
+
+    // 2. Status banner (최대 1개, 앰버)
+    let banner = '';
+    if (!isNull(c.fittingTest1)) {
+        let first = new Date(c.fittingTest1);
+        let fiveYearsAgo = new Date();
+        fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+        if (!isNaN(first.getTime()) && first < fiveYearsAgo) {
+            banner = '1차 적합검사 후 ' + elapsedText(c.fittingTest1) + ' 경과했습니다';
+        }
+    }
+    let allFittings = [c.fittingTest1, c.fittingTest2, c.fittingTest3, c.fittingTest4, c.fittingTest5]
+        .filter(d => !isNull(d)).map(d => new Date(d)).filter(d => !isNaN(d.getTime()));
+    let latestFitting = allFittings.length ? new Date(Math.max.apply(null, allFittings)) : null;
+    if (!banner && latestFitting) {
+        let oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        if (latestFitting < oneYearAgo) {
+            banner = '마지막 적합검사 후 ' + elapsedText(latestFitting) + ' 경과 — 재검사가 필요합니다';
+        }
+    }
+    if (banner) {
+        html += '<div class="detail-banner"><i class="fa fa-exclamation-circle"></i><span>' + banner + '</span></div>';
+    }
+
+    // 3. 연락처
+    let telRow = function (icon, label, number) {
+        return '<a class="detail-row detail-row-link" href="tel:' + encodeURIComponent(number) + '">'
+            + '<i class="fa ' + icon + ' detail-row-icon"></i>'
+            + '<div class="detail-row-main">'
+            + '<div class="detail-row-label">' + label + '</div>'
+            + '<div class="detail-row-value">' + escapeHtml(number) + '</div>'
+            + '</div>'
+            + '<i class="fa fa-phone detail-row-action"></i>'
+            + '</a>';
+    };
+    let contactRows = '';
+    if (!isNull(c.mobilePhoneNumber)) contactRows += telRow('fa-mobile', '핸드폰', c.mobilePhoneNumber);
+    if (!isNull(c.phoneNumber)) contactRows += telRow('fa-phone', '집전화', c.phoneNumber);
+    if (!isNull(c.address)) {
+        contactRows += '<div class="detail-row">'
+            + '<i class="fa fa-map-marker detail-row-icon"></i>'
+            + '<div class="detail-row-main">'
+            + '<div class="detail-row-label">주소</div>'
+            + '<div class="detail-row-value">' + escapeHtml(c.address) + '</div>'
+            + '</div></div>';
+    }
+    if (contactRows) html += card('연락처', contactRows);
+
+    // 4. 보청기
+    let aidRows = '';
+    if (c.hearingAid && c.hearingAid.length > 0) {
+        c.hearingAid.forEach(function (ha) {
+            let side_ko = ha.side === 'left' ? '좌측' : '우측';
+            let cls = ha.side === 'left' ? 'left' : 'right';
+            let subParts = [];
+            if (!isNull(ha.date)) {
+                subParts.push(escapeHtml(ha.date) + ' 구입');
+                let used = elapsedText(ha.date);
+                if (used) subParts.push(used + ' 사용');
+            }
+            aidRows += '<div class="detail-row">'
+                + '<span class="ha-badge ' + cls + '">' + side_ko + '</span>'
+                + '<div class="detail-row-main">'
+                + '<div class="detail-row-value">' + escapeHtml(ha.model || '-') + '</div>'
+                + (subParts.length ? '<div class="detail-row-sub">' + subParts.join(' · ') + '</div>' : '')
+                + '</div></div>';
+        });
+    }
+    if (!isNull(c.batteryOrderDate)) {
+        let ago = elapsedText(c.batteryOrderDate);
+        aidRows += '<div class="detail-row">'
+            + '<i class="fa fa-battery-half detail-row-icon"></i>'
+            + '<div class="detail-row-main">'
+            + '<div class="detail-row-label">배터리 구입</div>'
+            + '<div class="detail-row-value">' + escapeHtml(c.batteryOrderDate)
+            + (ago ? ' <span class="detail-muted">· ' + ago + ' 전</span>' : '')
+            + '</div></div></div>';
+    }
+    if (aidRows) html += card('보청기', aidRows);
+
+    // 5. 적합검사 (기록된 차수만, 최신 검사 강조)
+    let tests = [];
+    [c.fittingTest1, c.fittingTest2, c.fittingTest3, c.fittingTest4, c.fittingTest5].forEach(function (d, i) {
+        if (!isNull(d)) {
+            let dd = new Date(d);
+            if (!isNaN(dd.getTime())) tests.push({ n: i + 1, dateStr: d, d: dd });
+        }
+    });
+    if (tests.length > 0) {
+        let latest = tests.reduce((a, b) => (a.d > b.d ? a : b));
+        let oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        let ok = latest.d >= oneYearAgo;
+        let statusLine = '<div class="detail-status ' + (ok ? 'ok' : 'due') + '"><span class="status-dot"></span>'
+            + (ok ? '최근 1년 내 검사 완료'
+                : '재검사 필요 · 마지막 검사 후 ' + elapsedText(latest.d) + ' 경과')
+            + '</div>';
+        let list = '';
+        tests.forEach(function (t) {
+            let ago = elapsedText(t.d);
+            list += '<div class="detail-test-row' + (t === latest ? ' latest' : '') + '">'
+                + t.n + '차 · ' + escapeHtml(t.dateStr) + (ago ? ' · ' + ago + ' 전' : '')
+                + '</div>';
+        });
+        html += card('적합검사', statusLine + list);
+    }
+
+    // 6. 수리 이력 (최신순)
+    if (c.repairReport && c.repairReport.length > 0) {
+        let repairs = c.repairReport.slice().sort(function (a, b) {
+            return new Date(b.date) - new Date(a.date);
+        });
+        let rows = '';
+        repairs.forEach(function (r) {
+            rows += '<div class="detail-repair-row">'
+                + '<span class="detail-repair-date">' + escapeHtml(r.date || '') + '</span>'
+                + '<span class="detail-repair-content">' + escapeHtml(r.content || '') + '</span>'
+                + '</div>';
+        });
+        html += card('수리 이력', rows,
+            '<button type="button" class="btn detail-manage-btn" onclick="repairFromDetail()">관리</button>');
+    }
+
+    // 7. 메모
+    if (!isNull(c.note)) {
+        html += card('메모', '<div class="detail-note">' + escapeHtml(c.note) + '</div>');
+    }
+
+    document.getElementById('customerDetailBody').innerHTML = html;
+}
+
+// ══ 수정 폼: 적합검사 슬롯 점진 노출 ════════════════════════════════
+// 값이 있는 차수 + 첫 빈 슬롯만 보여주고 "+ 추가"로 확장합니다 (최대 5).
+// input name은 그대로라 저장 로직은 영향받지 않습니다.
+function refreshFittingSlots() {
+    let lastFilled = 0;
+    for (let i = 1; i <= 5; i++) {
+        if (!isNull(newCustomerForm.find("input[name='fittingTest" + i + "']").val())) lastFilled = i;
+    }
+    let visible = Math.min(lastFilled + 1, 5);
+    for (let i = 1; i <= 5; i++) {
+        let item = newCustomerForm.find("input[name='fittingTest" + i + "']").closest('.fitting-item');
+        item.toggle(i <= visible);
+    }
+    $('#btnAddFittingSlot').toggle(visible < 5);
+}
+
+function addFittingSlot() {
+    let hiddenItems = newCustomerForm.find('.fitting-item').filter(function () {
+        return this.style.display === 'none';
+    });
+    if (hiddenItems.length > 0) $(hiddenItems[0]).show();
+    if (hiddenItems.length <= 1) $('#btnAddFittingSlot').hide();
 }
 
 // UI Helpers
@@ -1698,7 +1974,7 @@ async function renderSalesStatsCustomers(year, month) {
                 `);
                 row.click(() => {
                     $('#salesStatisticsDialog').modal('hide');
-                    updateCustomer(customer.id);
+                    showCustomerDetail(customer.id);
                 });
                 tbody.append(row);
             });
