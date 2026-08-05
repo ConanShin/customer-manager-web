@@ -1,1 +1,8 @@
 .idea/
+
+# 로컬 전용 — 공개 저장소라 올리지 않는다.
+# scripts/ 에는 카카오 대화방 이름과 로컬 절대경로가 들어 있다.
+# 올릴 일이 생기면 개인정보를 환경변수로 뺀 뒤 git add -f 로 추가할 것.
+scripts/
+db/
+scratch_notes.txt

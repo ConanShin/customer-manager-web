@@ -584,6 +584,9 @@ async function loadCustomers() {
     // Update notice-section counts / empty states / mobile badge (idempotent)
     refreshNoticeSections();
 
+    // 메모에서 일정을 다시 색인한다 (달력 데이터 소스).
+    if (window.CalendarModule) window.CalendarModule.rebuild(allCustomers);
+
     $("#loader").hide();
 }
 
@@ -864,12 +867,16 @@ function toggleNoticeSection(headerEl) {
 }
 
 // Switch the visible column on mobile (<900px). No effect at desktop widths
-// because the CSS rules that consume `mobile-show-notice` are media-scoped.
+// because the CSS rules that consume `mobile-show-*` are media-scoped.
+// Tabs: 'list' (default) | 'calendar' | 'notice'.
 function switchMobileTab(tab) {
     document.body.classList.toggle('mobile-show-notice', tab === 'notice');
+    document.body.classList.toggle('mobile-show-calendar', tab === 'calendar');
     document.querySelectorAll('#mobileTabBar .mobile-tab').forEach(function (btn) {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
+    // 달력은 탭에 들어올 때 그린다 (숨어 있는 동안 재렌더하지 않기 위해).
+    if (tab === 'calendar' && window.CalendarModule) window.CalendarModule.mountMobile();
     window.scrollTo(0, 0);
 }
 
@@ -2099,6 +2106,25 @@ function getMockCustomers() {
         d.setFullYear(d.getFullYear() - n);
         return convertDate(d, '/');
     }
+    // ── 아래 3개는 달력(Calendar.js) 검증용 메모 날짜 생성기 ──
+    // 런타임 기준으로 만들어야 mock 모드에서 항상 이번 달에 일정이 보인다.
+    function ahead(n) {
+        let d = new Date();
+        d.setDate(d.getDate() + n);
+        return d;
+    }
+    // "YYYY/MM/DD" — 연도가 붙은 완전한 날짜
+    function dateAhead(n) { return convertDate(ahead(n), '/'); }
+    // "YYYY년 M월 D일" — 한글 완전 날짜
+    function koDateAhead(n) {
+        let d = ahead(n);
+        return d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일';
+    }
+    // "M/D" — 연도가 없는 짧은 날짜 (연도 추론 경로 검증용)
+    function shortAhead(n) {
+        let d = ahead(n);
+        return (d.getMonth() + 1) + '/' + d.getDate();
+    }
     // 기본값 + override 로 목 고객 생성
     function mock(overrides) {
         return Object.assign({
@@ -2135,13 +2161,17 @@ function getMockCustomers() {
             cardAvailability: "Yes", address: "서울시 강남구 테헤란로 123",
             phoneNumber: "02-345-6789", mobilePhoneNumber: "010-1234-5678",
             registrationDate: yearsAgo(1), fittingTest1: daysAgo(30),
+            // 달력 검증: 완전 날짜(오늘) + 완전 날짜(3일 뒤)
+            note: dateAhead(0) + " 배터리 수령 방문\n" + dateAhead(3) + " 착용 점검",
             hearingAid: [{ side: "left", model: "Genesis AI 24", date: daysAgo(5) }]
         }),
         mock({
             key: "mock-0002", id: "mock-0002", name: "이영희", birthDate: "1948/07/25", sex: "Female",
             address: "부산시 해운대구 우동 456",
             phoneNumber: "051-555-1212", mobilePhoneNumber: "010-2345-6789",
-            registrationDate: daysAgo(6), note: "양측 착용, 적응 잘함",
+            // 달력 검증: 한글 완전 날짜
+            registrationDate: daysAgo(6),
+            note: "양측 착용, 적응 잘함\n" + koDateAhead(5) + " 적합검사 예약",
             hearingAid: [
                 { side: "left", model: "Evolv AI 1200", date: daysAgo(5) },
                 { side: "right", model: "Evolv AI 1200", date: daysAgo(5) }
@@ -2154,6 +2184,8 @@ function getMockCustomers() {
             address: "대구시 수성구 범어동 789",
             phoneNumber: "053-777-8888", mobilePhoneNumber: "010-3456-7890",
             registrationDate: daysAgo(20), fittingTest1: daysAgo(18),
+            // 달력 검증: 상대 표현 ("3일 후" → 기준일 + 3)
+            note: dateAhead(1) + " 상담 예정, 3일 후 재방문",
             hearingAid: [{ side: "right", model: "Livio Edge AI", date: daysAgo(19) }]
         }),
 
@@ -2163,6 +2195,8 @@ function getMockCustomers() {
             cardAvailability: "Yes", address: "인천시 남동구 구월동 12",
             phoneNumber: "032-411-2233", mobilePhoneNumber: "010-4567-8901",
             registrationDate: daysAgo(50), fittingTest1: daysAgo(46),
+            // 달력 검증: 윗줄 연도를 물려받는 짧은 날짜 → "추정" 배지
+            note: dateAhead(2) + " 방문 예정\n" + shortAhead(9) + " A/S 수령",
             hearingAid: [{ side: "left", model: "Genesis AI 16", date: daysAgo(47) }]
         }),
 
@@ -2172,6 +2206,8 @@ function getMockCustomers() {
             address: "광주시 서구 화정동 34",
             phoneNumber: "062-222-3344", mobilePhoneNumber: "010-5678-9012",
             registrationDate: yearsAgo(1), fittingTest1: daysAgo(60),
+            // 달력 검증: 지난 일정 (뱃지가 회색으로 나와야 함)
+            note: dateAhead(-4) + " 청력검사 완료",
             hearingAid: [
                 { side: "left", model: "Evolv AI 2400", date: yearsAgo(1) },
                 { side: "right", model: "Evolv AI 2400", date: yearsAgo(1) }
@@ -2202,6 +2238,8 @@ function getMockCustomers() {
             address: "서울시 종로구 세종대로 90",
             phoneNumber: "02-733-1010", mobilePhoneNumber: "010-8901-2345",
             registrationDate: yearsAgo(3), fittingTest1: daysAgo(550),
+            // 달력 검증: 상대 표현 ("다음주 화요일")
+            note: dateAhead(0) + " 상담함, 다음주 화요일 방문 예정",
             hearingAid: [{ side: "left", model: "Genesis AI 24", date: yearsAgo(3) }]
         }),
         mock({
@@ -2261,7 +2299,9 @@ function getMockCustomers() {
             key: "mock-0015", id: "mock-0015", name: "신혜란", birthDate: "1968/02/28", sex: "Female",
             cardAvailability: "No", address: "대구시 중구 동성로 11",
             phoneNumber: "053-431-2211", mobilePhoneNumber: "010-9090-1212",
-            registrationDate: yearsAgo(3), fittingTest1: daysAgo(200), note: "정기 점검 필요",
+            // 달력 검증: 메모에 연도 단서가 전혀 없음 → 고객 최근 활동일을 앵커로 추론
+            registrationDate: yearsAgo(3), fittingTest1: daysAgo(200),
+            note: "정기 점검 필요\n" + shortAhead(14) + " 정기 점검 방문",
             hearingAid: [
                 { side: "left", model: "Livio Edge AI", date: yearsAgo(3) },
                 { side: "right", model: "Livio Edge AI", date: yearsAgo(3) }
@@ -2272,6 +2312,8 @@ function getMockCustomers() {
             address: "서울시 영등포구 여의도동 12",
             phoneNumber: "02-780-3434", mobilePhoneNumber: "010-1313-2424",
             registrationDate: daysAgo(400), fittingTest1: daysAgo(150),
+            // 달력 검증: 하루에 일정이 2건 이상 쌓이는 경우 (김민수와 같은 날)
+            note: dateAhead(0) + " 배터리 주문 확인",
             hearingAid: [{ side: "left", model: "Genesis AI 16", date: yearsAgo(3) }]
         })
     ];

@@ -1,0 +1,616 @@
+/* ============================================================
+   일정 달력 (Calendar)
+
+   base font 이 20px 인 앱이라 모든 치수를 rem 이 아닌 px 로 못 박아
+   달력 격자가 폰트 설정에 따라 흔들리지 않게 했다. 터치 타깃은 44px 이상.
+   ============================================================ */
+
+:root {
+    --cal-accent: #4f46e5;
+    --cal-accent-hover: #4338ca;
+    --cal-sun: #dc2626;
+    --cal-sat: #2563eb;
+    --cal-line: #e5e7eb;
+}
+
+/* ── 헤더의 달력 버튼 ─────────────────────────────────────── */
+#btnCalendar {
+    background-color: var(--cal-accent);
+    border-color: var(--cal-accent);
+    color: #fff;
+}
+
+#btnCalendar:hover,
+#btnCalendar:focus,
+#btnCalendar:active {
+    background-color: var(--cal-accent-hover);
+    border-color: var(--cal-accent-hover);
+    color: #fff;
+}
+
+#btnCalendar i {
+    margin-right: 6px;
+}
+
+/* ── 모달 폭 ─────────────────────────────────────────────── */
+.modal-calendar {
+    max-width: 1000px;
+}
+
+.modal-calendar .modal-body {
+    padding: 0;
+}
+
+/* ── 레이아웃 ────────────────────────────────────────────── */
+.cal-root {
+    display: block;
+}
+
+@media (min-width: 900px) {
+    .cal-root {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+        align-items: stretch;
+    }
+
+    .cal-main {
+        padding: 20px 24px 24px;
+        border-right: 1px solid var(--cal-line);
+    }
+
+    .cal-panel {
+        padding: 20px 20px 24px;
+        min-height: 460px;
+        display: flex;
+        flex-direction: column;
+    }
+}
+
+/* ── 달력 헤더 ───────────────────────────────────────────── */
+.cal-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.cal-head-title {
+    flex: 1;
+    text-align: center;
+    line-height: 1.25;
+    min-width: 0;
+}
+
+.cal-head-title strong {
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.cal-head-sub {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.cal-nav,
+.cal-today {
+    flex-shrink: 0;
+    background: var(--white);
+    border: 1px solid var(--cal-line);
+    border-radius: 8px;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.cal-nav {
+    width: 44px;
+    height: 44px;
+    font-size: 0.9rem;
+}
+
+.cal-today {
+    height: 44px;
+    padding: 0 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.cal-nav:hover,
+.cal-today:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+}
+
+.cal-nav:focus-visible,
+.cal-today:focus-visible,
+.cal-day:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.35);
+    outline-offset: 2px;
+}
+
+/* ── 요일 / 날짜 격자 ────────────────────────────────────── */
+.cal-weekdays,
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.cal-weekdays {
+    margin-bottom: 4px;
+}
+
+.cal-weekday {
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-light);
+    padding-bottom: 4px;
+}
+
+.cal-weekday.dow-0 {
+    color: var(--cal-sun);
+}
+
+.cal-weekday.dow-6 {
+    color: var(--cal-sat);
+}
+
+.cal-grid {
+    gap: 2px;
+    touch-action: pan-y;
+}
+
+.cal-day {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    padding: 4px 2px;
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.cal-day:hover {
+    background: #f3f4f6;
+}
+
+.cal-day-num {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    line-height: 1.1;
+}
+
+.cal-day.dow-0 .cal-day-num {
+    color: var(--cal-sun);
+}
+
+.cal-day.dow-6 .cal-day-num {
+    color: var(--cal-sat);
+}
+
+/* 이번 달이 아닌 날짜는 존재는 하되 뒤로 물러난다 */
+.cal-day.is-other {
+    opacity: 0.32;
+}
+
+/* 건수 뱃지 — 점 대신 숫자. 20px 기준 폰트 환경에서 "몇 건"이 즉시 읽혀야 한다 */
+.cal-day-count {
+    min-width: 20px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+/* 일정이 없는 날에도 같은 높이를 차지시켜 숫자가 위아래로 흔들리지 않게 한다 */
+.cal-day-count.is-blank {
+    background: transparent;
+    min-width: 0;
+    padding: 0;
+}
+
+/* 지난 일정은 회색 — "해야 할 일"과 "지나간 일"을 색으로 가른다 */
+.cal-day.is-past .cal-day-count {
+    background: #9ca3af;
+}
+
+.cal-day.is-today {
+    background: rgba(37, 99, 235, 0.09);
+}
+
+.cal-day.is-today .cal-day-num {
+    color: var(--primary-color);
+    font-weight: 800;
+}
+
+.cal-day.is-selected {
+    border-color: var(--primary-color);
+    background: rgba(37, 99, 235, 0.12);
+}
+
+/* ── 선택일 패널 ─────────────────────────────────────────── */
+.cal-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--cal-line);
+    margin-bottom: 10px;
+}
+
+.cal-panel-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.cal-panel-count {
+    flex-shrink: 0;
+    padding: 1px 9px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: var(--cal-accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.cal-add-open {
+    flex-shrink: 0;
+    background: var(--white);
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    min-height: 44px;
+}
+
+.cal-add-open i {
+    margin-right: 6px;
+}
+
+.cal-add-open:hover,
+.cal-add-open:focus {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+.cal-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cal-empty {
+    text-align: center;
+    color: var(--text-light);
+    padding: 34px 10px;
+}
+
+.cal-empty i {
+    font-size: 2rem;
+    opacity: 0.45;
+}
+
+.cal-empty p {
+    margin: 10px 0 0;
+    font-size: 0.8rem;
+}
+
+/* ── 일정 항목 ───────────────────────────────────────────── */
+.cal-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 52px;
+    padding: 10px 12px;
+    text-align: left;
+    background: var(--white);
+    border: 1px solid var(--cal-line);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.cal-item:hover,
+.cal-item:focus {
+    border-color: var(--primary-color);
+    background: #f8fafc;
+}
+
+.cal-item-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    white-space: nowrap;
+}
+
+.cal-item-text {
+    font-size: 0.78rem;
+    color: var(--text-light);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 연도를 주변 메모에서 추론한 일정임을 밝힌다 */
+.cal-item-est {
+    flex-shrink: 0;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.6rem;
+    font-weight: 700;
+}
+
+.cal-item-chevron {
+    color: #cbd5e1;
+    font-size: 0.75rem;
+}
+
+/* ── 일정 추가 폼 ────────────────────────────────────────── */
+.cal-add {
+    margin-top: 6px;
+    padding: 14px;
+    background: #f8fafc;
+    border: 1px solid var(--cal-line);
+    border-radius: 10px;
+}
+
+.cal-add-date {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--cal-accent);
+    margin-bottom: 10px;
+}
+
+.cal-add .form-control {
+    width: 100%;
+    height: 46px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: var(--white);
+    box-shadow: none;
+}
+
+.cal-add .form-control:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+.cal-add-search {
+    position: relative;
+    margin-bottom: 8px;
+}
+
+.cal-add-results {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 210px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+.cal-add-result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 12px;
+    background: var(--white);
+    border: 1px solid var(--cal-line);
+    border-radius: 8px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cal-add-result:hover,
+.cal-add-result:focus {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+}
+
+.cal-add-result-name {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.cal-add-result-phone {
+    font-size: 0.7rem;
+    color: var(--text-light);
+}
+
+.cal-add-noresult {
+    padding: 10px 12px;
+    font-size: 0.72rem;
+    color: var(--text-light);
+}
+
+.cal-add-picked {
+    margin-bottom: 8px;
+}
+
+.cal-add-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px 7px 14px;
+    border-radius: 999px;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.cal-add-chip small {
+    font-weight: 500;
+    opacity: 0.85;
+}
+
+.cal-add-chip-x {
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-size: 0.9rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.cal-add-text {
+    margin-bottom: 10px;
+}
+
+.cal-add-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.cal-add-actions .btn {
+    flex: 1;
+    min-height: 46px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.cal-add-hint {
+    margin: 10px 0 0;
+    font-size: 0.65rem;
+    color: var(--text-light);
+    line-height: 1.5;
+}
+
+.cal-add-hint code {
+    font-size: 0.65rem;
+    background: #eef2ff;
+    color: var(--cal-accent);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+/* ── 모바일 (< 900px) ────────────────────────────────────── */
+
+/* 데스크탑에서는 모바일 전용 pane 이 존재하지 않는다 */
+#calendarContent {
+    display: none;
+}
+
+@media (max-width: 899px) {
+
+    /* 달력 탭이 켜졌을 때만 pane 을 보여준다.
+       (#customerListContent / #noticeContent 의 표시 규칙은 CustomerList.css 참고) */
+    body.mobile-show-calendar #customerListContent {
+        display: none;
+    }
+
+    body.mobile-show-calendar #calendarContent {
+        display: block;
+    }
+
+    .cal-main {
+        position: sticky;
+        top: 60px;
+        /* app-bar 높이 */
+        z-index: 5;
+        background: var(--white);
+        padding: 14px 12px 10px;
+        border-radius: 12px 12px 0 0;
+        border-bottom: 1px solid var(--cal-line);
+    }
+
+    .cal-panel {
+        background: var(--white);
+        padding: 14px 12px 20px;
+        border-radius: 0 0 12px 12px;
+    }
+
+    .cal-day {
+        min-height: 56px;
+    }
+
+    .cal-day-num {
+        font-size: 0.9rem;
+    }
+
+    /* 좁은 화면에서 고객명과 내용이 겹치지 않게 두 줄로 */
+    .cal-item {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        grid-template-areas:
+            "name est chevron"
+            "text text chevron";
+        row-gap: 3px;
+        min-height: 60px;
+    }
+
+    .cal-item-name {
+        grid-area: name;
+    }
+
+    .cal-item-text {
+        grid-area: text;
+        white-space: normal;
+        overflow: visible;
+        line-height: 1.4;
+    }
+
+    .cal-item-est {
+        grid-area: est;
+    }
+
+    .cal-item-chevron {
+        grid-area: chevron;
+    }
+
+    .cal-panel-head {
+        flex-wrap: wrap;
+    }
+
+    /* 모바일에서 달력은 탭으로 여니 모달은 쓰지 않는다 */
+    #calendarDialog {
+        display: none !important;
+    }
+}
+
+/* 데스크탑 모달 안에서는 pane 이 스크롤을 따로 갖는다 */
+@media (min-width: 900px) {
+    .modal-calendar .cal-panel-body {
+        max-height: 420px;
+    }
+}

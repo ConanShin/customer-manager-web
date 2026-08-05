@@ -22,7 +22,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" type="text/css" href="../css/CustomerList.css?v=20260712_2">
+    <link rel="stylesheet" type="text/css" href="../css/CustomerList.css?v=20260806_1">
+    <link rel="stylesheet" type="text/css" href="../css/Calendar.css?v=20260806_1">
 </head>
 
 <body>
@@ -55,6 +56,9 @@
                             </label>
                         </div>
                         <button id="btnSalesStats" type="button" class="btn btn-success">실적</button>
+                        <button id="btnCalendar" type="button" class="btn">
+                            <i class="fa fa-calendar" aria-hidden="true"></i>달력
+                        </button>
                     </div>
                     <div class="search-container">
                         <div class="search-input-wrap">
@@ -203,6 +207,25 @@
                         <thead></thead>
                         <tbody></tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+        <!-- 달력: 모바일(<900px) 전용 pane. 데스크탑에서는 아래 모달로 뜬다. -->
+        <div id="calendarContent">
+            <div id="calendarMountMobile"></div>
+        </div>
+
+        <!-- Calendar Dialog (desktop) -->
+        <div id="calendarDialog" class="modal fade" role="dialog">
+            <div class="modal-dialog modal-calendar">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title">일정 달력</h3>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">닫기</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="calendarMount"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -498,6 +521,10 @@
             <i class="fa fa-users" aria-hidden="true"></i>
             <span>고객 리스트</span>
         </button>
+        <button type="button" class="mobile-tab" data-tab="calendar" onclick="switchMobileTab('calendar')">
+            <i class="fa fa-calendar" aria-hidden="true"></i>
+            <span>달력</span>
+        </button>
         <button type="button" class="mobile-tab" data-tab="notice" onclick="switchMobileTab('notice')">
             <span class="mobile-tab-icon-wrap">
                 <i class="fa fa-bell" aria-hidden="true"></i>
@@ -511,6 +538,8 @@
         <h4>처리 중...</h4>
     </div>
 </body>
-<script src="../js/CustomerList.js?v=20260712_2" charset="utf-8"></script>
+<script src="../js/memoDates.js?v=20260806_1" charset="utf-8"></script>
+<script src="../js/Calendar.js?v=20260806_1" charset="utf-8"></script>
+<script src="../js/CustomerList.js?v=20260806_1" charset="utf-8"></script>
 
 </html>
